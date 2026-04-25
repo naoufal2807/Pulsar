@@ -1,0 +1,61 @@
+<svg width="200" height="200" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <title>Pulsar logo</title>
+  <desc>A modern logo featuring a rotating pulsar star design with concentric rings and dynamic rays</desc>
+  
+  <defs>
+    <style>
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .pulsar-spin {
+        animation: rotate 4s linear infinite;
+        transform-origin: 200px 200px;
+      }
+    </style>
+  </defs>
+  
+  <!-- Outer glow rings -->
+  <circle cx="200" cy="200" r="180" fill="none" stroke="#0066ff" stroke-width="0.5" opacity="0.3"/>
+  <circle cx="200" cy="200" r="160" fill="none" stroke="#0066ff" stroke-width="0.5" opacity="0.2"/>
+  
+  <!-- Rotating element group -->
+  <g class="pulsar-spin">
+    <!-- 8 rays emanating from center -->
+    <g stroke="#0066ff" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.8">
+      <line x1="200" y1="200" x2="200" y2="40"/>
+      <line x1="200" y1="200" x2="341" y2="59"/>
+      <line x1="200" y1="200" x2="360" y2="200"/>
+      <line x1="200" y1="200" x2="341" y2="341"/>
+      <line x1="200" y1="200" x2="200" y2="360"/>
+      <line x1="200" y1="200" x2="59" y2="341"/>
+      <line x1="200" y1="200" x2="40" y2="200"/>
+      <line x1="200" y1="200" x2="59" y2="59"/>
+    </g>
+    
+    <!-- Alternating rays (offset for visual interest) -->
+    <g stroke="#3399ff" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.5">
+      <line x1="200" y1="200" x2="270" y2="59"/>
+      <line x1="200" y1="200" x2="341" y2="130"/>
+      <line x1="200" y1="200" x2="330" y2="270"/>
+      <line x1="200" y1="200" x2="270" y2="341"/>
+      <line x1="200" y1="200" x2="130" y2="341"/>
+      <line x1="200" y1="200" x2="59" y2="270"/>
+      <line x1="200" y1="200" x2="70" y2="130"/>
+      <line x1="200" y1="200" x2="130" y2="59"/>
+    </g>
+  </g>
+  
+  <!-- Static concentric circles -->
+  <circle cx="200" cy="200" r="130" fill="none" stroke="#0066ff" stroke-width="1.5" opacity="0.4"/>
+  <circle cx="200" cy="200" r="100" fill="none" stroke="#0066ff" stroke-width="1.5" opacity="0.4"/>
+  <circle cx="200" cy="200" r="70" fill="none" stroke="#0066ff" stroke-width="1.5" opacity="0.4"/>
+  
+  <!-- Central core -->
+  <circle cx="200" cy="200" r="35" fill="#0066ff" opacity="0.9"/>
+  <circle cx="200" cy="200" r="25" fill="#ffffff" opacity="0.8"/>
+  <circle cx="200" cy="200" r="12" fill="#0066ff"/>
+  
+  <!-- Highlight on core -->
+  <circle cx="210" cy="190" r="6" fill="#ffffff" opacity="0.6"/>
+</svg>
