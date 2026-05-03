@@ -3,7 +3,7 @@
 import typer
 from pathlib import Path
 import json
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import polars as pl
 
@@ -15,6 +15,55 @@ from pulsar.output.formatter import format_validation_output
 
 app = typer.Typer(help="Pulsar - Data Quality CLI")
 logger = get_logger("pulsar.cli")
+
+
+def _format_profile_text(profile: Dict[str, Any], verbose: bool = False) -> str:
+    """Format profile as text table."""
+    lines = []
+    lines.append("\n" + "="*80)
+    lines.append(f"📊 Dataset: {profile['dataset_name']}")
+    lines.append(f"   {profile['row_count']:,} rows | {profile['column_count']} columns")
+    lines.append("="*80)
+    
+    for col_name, col_data in profile["columns"].items():
+        lines.append(f"\nColumn: {col_name} ({col_data['dtype']})")
+        lines.append(f"├─ Completeness: {col_data['completeness']*100:.1f}% ({col_data['non_null_count']}/{profile['row_count']})")
+        lines.append(f"├─ Uniqueness: {col_data['uniqueness']*100:.1f}% ({col_data['distinct_count']} distinct)")
+        
+        # Numeric stats
+        if "numeric_stats" in col_data:
+            stats = col_data["numeric_stats"]
+            if not stats.get("error"):
+                lines.append(f"├─ Distribution: Min {stats.get('min')} | Max {stats.get('max')} | Mean {stats.get('mean'):.2f}")
+                if verbose and "skewness" in stats:
+                    lines.append(f"├─ Skewness: {stats['skewness']:.2f}")
+                    lines.append(f"├─ Kurtosis: {stats['kurtosis']:.2f}")
+                    if "outliers" in stats:
+                        lines.append(f"├─ Outliers (IQR): {stats['outliers'].get('iqr_method', 0)}")
+                lines.append(f"└─ Percentiles: P25: {stats.get('p25')} | P50: {stats.get('p50')} | P75: {stats.get('p75')}")
+        
+        # DateTime stats
+        elif "datetime_stats" in col_data:
+            stats = col_data["datetime_stats"]
+            lines.append(f"├─ Min: {stats.get('min')}")
+            lines.append(f"└─ Max: {stats.get('max')}")
+        
+        # Categorical stats
+        elif "categorical_stats" in col_data:
+            stats = col_data["categorical_stats"]
+            if stats.get("top_k"):
+                lines.append(f"├─ Top values:")
+                for item in stats["top_k"][:5]:
+                    lines.append(f"│  • {item['value']}: {item['count']}")
+            if verbose and "string_patterns" in stats:
+                patterns = stats["string_patterns"]
+                lines.append(f"├─ Patterns:")
+                for pattern, count in list(patterns.items())[:3]:
+                    lines.append(f"│  • {pattern}: {count}")
+            lines.append(f"└─ Samples: {', '.join(col_data['sample_values'][:3])}")
+    
+    lines.append("\n" + "="*80 + "\n")
+    return "\n".join(lines)
 
 
 @app.command()
@@ -30,16 +79,39 @@ def profile(
     logger.info(f"Profile command: file={file}, output={output}, verbose={verbose}")
     
     try:
+        from pulsar.core.profiling.profiler import profile_dataset
+        
         lf = load(file)
         logger.info(f"File loaded: {file}")
         
-        if output == "text":
-            print(f"✅ Profiled: {file}")
-        elif output == "json":
-            print(json.dumps({"status": "ok", "file": file}))
+        # Profile the dataset
+        profile_data = profile_dataset(lf, path=file, detailed=verbose)
+        logger.info(f"Dataset profiled: {profile_data['row_count']} rows, {profile_data['column_count']} columns")
         
+        # Filter columns if specified
+        if columns:
+            col_list = [c.strip() for c in columns.split(",")]
+            profile_data["columns"] = {k: v for k, v in profile_data["columns"].items() if k in col_list}
+            logger.info(f"Filtered to {len(profile_data['columns'])} columns")
+        
+        # Format output
+        if output == "json":
+            print(json.dumps(profile_data, indent=2, default=str))
+        else:  # text
+            formatted = _format_profile_text(profile_data, verbose=verbose)
+            print(formatted)
+        
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        logger.error(f"Profile error: {e}")
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1)
     except Exception as e:
-        logger.error(f"Profile failed: {e}", exc_info=True)
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
 
 

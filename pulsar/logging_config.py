@@ -1,56 +1,113 @@
 # pulsar/logging_config.py
 
 import logging
-import sys
+import logging.handlers
+import os
 from datetime import datetime
+from pathlib import Path
+import uuid
 
 
-def setup_logging(verbose: bool = False, log_file: str = None) -> logging.Logger:
+# Global session ID
+SESSION_ID = str(uuid.uuid4())[:8]
+
+
+def setup_logging(
+    log_dir: str = "logs",
+    level: int = logging.INFO,
+    session_id: str = None
+) -> str:
     """
-    Configure logging for Pulsar.
+    Setup file and console logging with session ID
     
     Args:
-        verbose: If True, set to DEBUG level, else INFO
-        log_file: Optional file path to write logs to
-        
+        log_dir: Directory to store log files
+        level: Logging level (DEBUG, INFO, WARNING, ERROR)
+        session_id: Unique session identifier (auto-generated if None)
+    
     Returns:
-        Configured logger instance
+        Path to log file
+    
+    Example:
+        log_file = setup_logging(level=logging.DEBUG)
+        logger = get_logger("my_module")
     """
-    logger = logging.getLogger("pulsar")
     
-    # Clear existing handlers
-    logger.handlers = []
+    global SESSION_ID
+    if session_id:
+        SESSION_ID = session_id
     
-    # Set level
-    level = logging.DEBUG if verbose else logging.INFO
-    logger.setLevel(level)
+    # Create logs directory
+    log_path = Path(log_dir)
+    log_path.mkdir(exist_ok=True)
     
-    # Format
+    # Generate log file name with timestamp and session ID
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_path / f"pulsar_{timestamp}_{SESSION_ID}.log"
+    
+    # Create formatter
     formatter = logging.Formatter(
-        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        fmt='%(asctime)s | %(sessionId)s | %(name)s | %(levelname)s | %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Console handler (always)
-    console_handler = logging.StreamHandler(sys.stderr)
+    # File handler (verbose, includes everything)
+    file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)  # File gets everything
+    file_handler.setFormatter(formatter)
+    
+    # Console handler (less verbose)
+    console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    console_formatter = logging.Formatter(
+        fmt='%(levelname)s | %(name)s | %(message)s'
+    )
+    console_handler.setFormatter(console_formatter)
     
-    # File handler (optional)
-    if log_file:
-        try:
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setLevel(level)
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-            logger.info(f"Logging to file: {log_file}")
-        except Exception as e:
-            logger.warning(f"Could not create log file {log_file}: {e}")
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # Root captures everything
     
-    return logger
+    # Clear existing handlers
+    root_logger.handlers.clear()
+    
+    # Add handlers
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # Add session ID to log records
+    logging.LogRecord.sessionId = SESSION_ID
+    old_factory = logging.getLogRecordFactory()
+    
+    def log_record_factory(*args, **kwargs):
+        record = old_factory(*args, **kwargs)
+        record.sessionId = SESSION_ID
+        return record
+    
+    logging.setLogRecordFactory(log_record_factory)
+    
+    root_logger.info(f"Logging initialized | Session: {SESSION_ID} | File: {log_file}")
+    
+    return str(log_file)
 
 
-def get_logger(name: str = "pulsar") -> logging.Logger:
-    """Get or create a logger instance."""
+def get_logger(name: str) -> logging.Logger:
+    """
+    Get logger for a specific module
+    
+    Args:
+        name: Module name (usually __name__)
+    
+    Returns:
+        Logger instance
+    
+    Example:
+        logger = get_logger("pulsar.quality.rules")
+        logger.info("Something happened")
+    """
     return logging.getLogger(name)
+
+
+def get_session_id() -> str:
+    """Get current session ID"""
+    return SESSION_ID
