@@ -60,6 +60,79 @@ Done. You know what you're working with.
 
 ---
 
+## Quick Start
+
+### Profile
+
+```bash
+# Install
+git clone https://github.com/naoufal2807/Pulsar.io.git
+cd Pulsar.io
+pip install -e .
+
+# Profile
+pulsar profile data.csv
+
+# Specific columns
+pulsar profile data.csv --columns user_id,email
+
+# Advanced metrics (outliers, patterns, skewness)
+pulsar profile data.csv --verbose
+
+# JSON export
+pulsar profile data.csv --output json > profile.json
+
+# Debug mode
+pulsar profile data.csv --verbose --log-file debug.log
+```
+
+### Validate
+
+Create `rules.yaml`:
+
+```yaml
+rules:
+  - name: "email_valid"
+    column: "email"
+    type: "regex"
+    pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    threshold: 0.95
+
+  - name: "user_id_unique"
+    column: "user_id"
+    type: "unique"
+    threshold: 1.0
+
+  - name: "age_range"
+    column: "age"
+    type: "range"
+    min: 0
+    max: 150
+    threshold: 1.0
+```
+
+Run:
+
+```bash
+pulsar validate data.csv --rules rules.yaml --verbose
+```
+
+Output:
+
+```
+======================================================================
+VALIDATION RESULTS
+======================================================================
+✅ email_valid                    PASS     95.2%
+✅ user_id_unique                 PASS    100.0%
+✅ age_range                      PASS    100.0%
+----------------------------------------------------------------------
+Summary: 3/3 rules passed (100.0%)
+======================================================================
+```
+
+---
+
 ## Why Choose Pulsar?
 
 ### Speed
@@ -110,32 +183,6 @@ For **quick data inspection**, Pulsar wins.
 
 ---
 
-## How It Works
-
-```bash
-# Install
-git clone https://github.com/naoufal2807/Pulsar.io.git
-cd Pulsar.io
-pip install -e .
-
-# Profile
-pulsar profile data.csv
-
-# Specific columns
-pulsar profile data.csv --columns user_id,email
-
-# Advanced metrics (outliers, patterns, skewness)
-pulsar profile data.csv --verbose
-
-# JSON export
-pulsar profile data.csv --output json > profile.json
-
-# Debug mode
-pulsar profile data.csv --verbose --log-file debug.log
-```
-
----
-
 ## What You Get
 
 ### Phase 1 (Now) ✅
@@ -146,14 +193,15 @@ pulsar profile data.csv --verbose --log-file debug.log
 - ✅ Outlier detection (IQR + Z-score methods)
 - ✅ Pattern matching (emails, URLs, phones, dates)
 - ✅ Column filtering
+- ✅ Validation rules (YAML-based, 5 rule types)
 - ✅ Verbose mode for deep dives
 - ✅ Multiple output formats (text, JSON, CSV)
 - ✅ Full logging & debugging
 
 ### Phase 2 (Coming) 🔜
 
-- Validation rules (YAML-based, no code)
 - Real-time monitoring (watch your data continuously)
+- Drift detection (compare to baseline)
 - Quality scoring (% of rules passed)
 - Alerts (Slack, email, webhooks)
 
@@ -161,8 +209,8 @@ pulsar profile data.csv --verbose --log-file debug.log
 
 - REST API (integrate into pipelines)
 - Database connectors (Snowflake, BigQuery, Postgres)
-- PII detection (find sensitive data)
-- Data lineage tracking
+- Anomaly detection (statistical outliers)
+- Predictive forecasting (forecast degradation)
 
 ---
 
@@ -205,4 +253,4 @@ MIT. Use it, fork it, modify it.
 
 ---
 
-**Trust your data. Inspect it fast.** ⚡
+**Trust your data. Pulsar ⚡**
