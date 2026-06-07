@@ -407,5 +407,92 @@ def infer(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def journey(
+    file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
+    stage: Optional[str] = typer.Option(None, help="Start at specific stage: scout, explorer, detective, analyst, ace"),
+    full: bool = typer.Option(False, "--full", help="Run complete journey from SCOUT to ACE"),
+    save: bool = typer.Option(False, "--save", help="Save journey report to file"),
+    log_file: Optional[str] = typer.Option(None, help="Log file path"),
+):
+    """Explore your data on a guided journey from Zero to Ace understanding."""
+    log_path = setup_logging(log_file or "logs")
+    logger.info(f"Journey command: file={file}, stage={stage}, full={full}")
+
+    try:
+        from pulsar.core.intelligence.journey import DataExplorationJourney, Stage
+
+        # Load data
+        lf = load(file)
+        df = lf.collect()
+        dataset_name = Path(file).stem
+        logger.info(f"File loaded: {file}")
+
+        # Initialize journey
+        journey_obj = DataExplorationJourney(df, dataset_name)
+        logger.info(f"Journey initialized for {dataset_name}")
+
+        # Run appropriate stage
+        if full:
+            # Run complete journey
+            logger.info("Running complete journey SCOUT → ACE")
+            result = journey_obj.run_complete_journey()
+        elif stage:
+            # Run specific stage
+            stage_map = {
+                'scout': journey_obj.start_journey,
+                'explorer': journey_obj.explore_stage,
+                'detective': journey_obj.detective_stage,
+                'analyst': journey_obj.analyst_stage,
+                'ace': journey_obj.ace_stage,
+            }
+
+            if stage.lower() not in stage_map:
+                typer.echo(
+                    f"[ERROR] Unknown stage: {stage}. "
+                    f"Use: scout, explorer, detective, analyst, or ace",
+                    err=True
+                )
+                raise typer.Exit(code=1)
+
+            logger.info(f"Running stage: {stage}")
+            result = stage_map[stage.lower()]()
+        else:
+            # Default: start at SCOUT
+            logger.info("Starting journey at SCOUT stage")
+            result = journey_obj.start_journey()
+
+        # Output result
+        print(result)
+
+        # Save if requested
+        if save:
+            report_path = Path(f"journey_reports/{dataset_name}_journey.md")
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(result)
+            print(f"\n[OK] Journey report saved: {report_path}")
+            logger.info(f"Report saved: {report_path}")
+
+        # Show summary
+        summary = journey_obj.get_journey_summary()
+        print(f"\n{'='*80}")
+        print(f"Journey Summary")
+        print(f"{'='*80}")
+        print(f"Dataset: {summary['dataset']}")
+        print(f"Size: {summary['total_rows']:,} rows × {summary['total_columns']} columns")
+        print(f"Stage: {summary['current_stage'].upper()}")
+        print(f"Progress: {summary['progress_percent']}%")
+        print(f"Insights Gained: {summary['total_insights']}")
+
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        typer.echo(f"[ERROR] {e}", err=True)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        logger.error(f"Journey error: {e}", exc_info=True)
+        typer.echo(f"[ERROR] {e}", err=True)
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
