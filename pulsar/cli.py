@@ -344,7 +344,7 @@ def infer(
             f"Key metrics={metrics_str}. "
             f"What does this data represent and what insights can we draw?"
         )
-        logger.info("Agent reasoning complete")
+        logger.info(f"Agent reasoning complete - Response: {domain_analysis[:200] if domain_analysis else 'empty'}")
 
         # Generate deep analysis with agent insights
         from pulsar.core.intelligence.small_world.deep_analyzer import DeepAnalyzer
