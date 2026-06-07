@@ -2,10 +2,11 @@
 """Diagnosis layer: Root cause analysis, anomaly detection, and impact assessment."""
 
 from .llm_base import LLMProvider, OllamaProvider, LLMConfig, LLMProviderType, get_llm_provider
-from .anomaly_detector import AnomalyDetector, Anomaly, AnomalyType, AnomalySeverity
-from .root_cause_analyzer import RootCauseAnalyzer, RootCauseAnalysis
-from .impact_assessor import ImpactAssessor, Impact, ImpactScope, ImpactDomain
-from .trend_analyzer import TrendAnalyzer, AnomalyTrend, TrendDirection
+from .models import Anomaly, AnomalyType, RootCause, Impact, Trend, DiagnosisResult
+from .anomaly_detector import AnomalyDetector
+from .root_cause_analyzer import RootCauseAnalyzer
+from .impact_assessor import ImpactAssessor
+from .trend_analyzer import TrendAnalyzer
 
 __all__ = [
     'LLMProvider',
@@ -13,17 +14,14 @@ __all__ = [
     'LLMConfig',
     'LLMProviderType',
     'get_llm_provider',
-    'AnomalyDetector',
     'Anomaly',
     'AnomalyType',
-    'AnomalySeverity',
-    'RootCauseAnalyzer',
-    'RootCauseAnalysis',
-    'ImpactAssessor',
+    'RootCause',
     'Impact',
-    'ImpactScope',
-    'ImpactDomain',
+    'Trend',
+    'DiagnosisResult',
+    'AnomalyDetector',
+    'RootCauseAnalyzer',
+    'ImpactAssessor',
     'TrendAnalyzer',
-    'AnomalyTrend',
-    'TrendDirection',
 ]

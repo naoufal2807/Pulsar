@@ -10,22 +10,12 @@ Takes detected anomalies and uses LLM to:
 
 from typing import Any, Dict, List, Optional
 import logging
-from dataclasses import dataclass
 
+import polars as pl
 from .llm_base import LLMProvider, LLMConfig, LLMProviderType, get_llm_provider
-from .anomaly_detector import Anomaly, AnomalySeverity
+from .models import Anomaly, RootCause, AnomalyType
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class RootCauseAnalysis:
-    """Root cause analysis result."""
-    anomaly: Anomaly
-    probable_causes: List[str]
-    explanation: str
-    remediation_steps: List[str]
-    confidence: float
 
 
 class RootCauseAnalyzer:
@@ -34,6 +24,7 @@ class RootCauseAnalyzer:
 
     Uses pluggable LLM providers (Ollama, OpenAI, Anthropic, etc.)
     to generate intelligent explanations of detected anomalies.
+    Falls back to heuristics if LLM unavailable.
     """
 
     def __init__(
@@ -45,319 +36,159 @@ class RootCauseAnalyzer:
         Initialize root cause analyzer.
 
         Args:
-            llm_config: LLM provider configuration
+            llm_config: LLM provider configuration (uses Ollama/Gemma by default)
             config: Optional analyzer configuration
         """
         self.config = config or {}
-        self.llm = None
+        self.logger = logger
 
-        # Initialize LLM provider if config provided
+        # Initialize LLM provider
         if llm_config:
+            self.llm_provider = get_llm_provider(llm_config)
+            self.use_llm = self.llm_provider.health_check()
+        else:
+            # Default to Ollama/Gemma3:270m
+            default_config = LLMConfig(
+                provider_type=LLMProviderType.OLLAMA,
+                model_name="gemma3:270m",
+                base_url="http://localhost:11434",
+                temperature=0.5,
+                max_tokens=500
+            )
             try:
-                self.llm = get_llm_provider(llm_config)
-                if self.llm.health_check():
-                    logger.info(f"LLM provider '{llm_config.model_name}' initialized and healthy")
-                else:
-                    logger.warning(f"LLM provider '{llm_config.model_name}' health check failed")
-                    self.llm = None
-            except Exception as e:
-                logger.warning(f"Failed to initialize LLM provider: {e}")
-                self.llm = None
+                self.llm_provider = get_llm_provider(default_config)
+                self.use_llm = self.llm_provider.health_check()
+            except Exception:
+                self.use_llm = False
+                self.llm_provider = None
 
-    def analyze(
-        self,
-        anomalies: List[Anomaly],
-        context: Dict[str, Any],
-    ) -> List[RootCauseAnalysis]:
+        self.logger.info(f"RootCauseAnalyzer initialized. LLM available: {self.use_llm}")
+
+    def analyze(self, df: pl.DataFrame, anomaly: Anomaly) -> RootCause:
         """
-        Analyze root causes for detected anomalies.
+        Analyze root cause of an anomaly.
 
         Args:
-            anomalies: List of detected anomalies
-            context: Data context (patterns, understanding, etc.)
+            df: DataFrame being analyzed
+            anomaly: Anomaly object to analyze
 
         Returns:
-            List of root cause analyses
-        """
-        analyses = []
-
-        for anomaly in anomalies:
-            try:
-                # Use LLM if available, otherwise fallback to heuristics
-                if self.llm:
-                    analysis = self._analyze_with_llm(anomaly, context)
-                else:
-                    analysis = self._analyze_heuristic(anomaly, context)
-
-                analyses.append(analysis)
-
-            except Exception as e:
-                logger.debug(f"Error analyzing anomaly: {e}")
-                # Fallback heuristic analysis
-                analysis = self._analyze_heuristic(anomaly, context)
-                analyses.append(analysis)
-
-        return analyses
-
-    def _analyze_with_llm(
-        self,
-        anomaly: Anomaly,
-        context: Dict[str, Any],
-    ) -> RootCauseAnalysis:
-        """
-        Analyze anomaly using LLM.
-
-        Args:
-            anomaly: Detected anomaly
-            context: Data context
-
-        Returns:
-            Root cause analysis
+            RootCause object with analysis results
         """
         try:
-            # Build prompt for LLM
-            prompt = self._build_analysis_prompt(anomaly, context)
+            if self.use_llm:
+                return self._analyze_with_llm(df, anomaly)
+            else:
+                return self._analyze_heuristic(df, anomaly)
+        except Exception as e:
+            self.logger.error(f"Root cause analysis failed: {e}")
+            return self._analyze_heuristic(df, anomaly)
 
-            # Generate explanation using LLM
-            explanation = self.llm.generate(prompt)
+    def _analyze_with_llm(self, df: pl.DataFrame, anomaly: Anomaly) -> RootCause:
+        """Analyze using LLM (Ollama/Gemma3:270m)."""
+        try:
+            prompt = self._build_analysis_prompt(df, anomaly)
+            response = self.llm_provider.generate(prompt)
 
-            # Parse LLM response
-            probable_causes = self._extract_causes(explanation)
-            remediation_steps = self._extract_remediation(explanation)
-
-            # Calculate confidence based on anomaly
-            confidence = min(1.0, anomaly.confidence + 0.2)  # Boost by LLM analysis
-
-            return RootCauseAnalysis(
-                anomaly=anomaly,
-                probable_causes=probable_causes,
-                explanation=explanation[:500],  # Limit explanation length
-                remediation_steps=remediation_steps,
-                confidence=confidence,
+            return RootCause(
+                root_cause=response[:200],
+                confidence=0.8,
+                explanation=response,
+                method="llm",
+                probable_causes=[response.split('.')[0]],
+                suggested_action=f"Review {anomaly.column_name} for potential {anomaly.anomaly_type.value}"
             )
 
         except Exception as e:
-            logger.warning(f"LLM analysis failed: {e}, falling back to heuristics")
-            return self._analyze_heuristic(anomaly, context)
+            self.logger.warning(f"LLM analysis failed, using heuristics: {e}")
+            return self._analyze_heuristic(df, anomaly)
 
-    def _analyze_heuristic(
-        self,
-        anomaly: Anomaly,
-        context: Dict[str, Any],
-    ) -> RootCauseAnalysis:
-        """
-        Analyze anomaly using rule-based heuristics.
+    def _analyze_heuristic(self, df: pl.DataFrame, anomaly: Anomaly) -> RootCause:
+        """Analyze using rule-based heuristics."""
+        probable_causes = []
+        explanation = ""
 
-        Args:
-            anomaly: Detected anomaly
-            context: Data context
+        if anomaly.anomaly_type == AnomalyType.OUTLIER:
+            probable_causes = [
+                "Data entry error",
+                "System malfunction",
+                "Genuine outlier event",
+                "Sensor/measurement error"
+            ]
+            explanation = f"Value {anomaly.value} is statistically outside expected range"
 
-        Returns:
-            Root cause analysis
-        """
-        probable_causes = self._generate_probable_causes(anomaly, context)
-        explanation = self._generate_explanation(anomaly, probable_causes)
-        remediation_steps = self._generate_remediation(anomaly, probable_causes)
+        elif anomaly.anomaly_type == AnomalyType.BEHAVIORAL_SHIFT:
+            probable_causes = [
+                "Distribution change",
+                "Sampling bias",
+                "Population shift"
+            ]
+            explanation = "Data distribution has shifted significantly"
 
-        return RootCauseAnalysis(
-            anomaly=anomaly,
-            probable_causes=probable_causes,
+        elif anomaly.anomaly_type == AnomalyType.NULL_PATTERN:
+            probable_causes = [
+                "Missing data collection",
+                "System downtime",
+                "Incomplete import"
+            ]
+            explanation = f"High null ratio in {anomaly.column_name}"
+
+        elif anomaly.anomaly_type == AnomalyType.DUPLICATE:
+            probable_causes = [
+                "Data not deduplicated",
+                "Import duplication",
+                "ETL error"
+            ]
+            explanation = f"Low cardinality suggests duplicates in {anomaly.column_name}"
+
+        return RootCause(
+            root_cause=probable_causes[0] if probable_causes else "Unknown",
+            confidence=0.6,
             explanation=explanation,
-            remediation_steps=remediation_steps,
-            confidence=anomaly.confidence,
+            method="heuristic",
+            probable_causes=probable_causes,
+            suggested_action=f"Investigate {anomaly.anomaly_type.value} in {anomaly.column_name}"
         )
 
-    def _build_analysis_prompt(
-        self,
-        anomaly: Anomaly,
-        context: Dict[str, Any],
-    ) -> str:
-        """
-        Build prompt for LLM analysis.
+    def _build_analysis_prompt(self, df: pl.DataFrame, anomaly: Anomaly) -> str:
+        """Build LLM prompt for analysis."""
+        col_data = df[anomaly.column_name]
 
-        Args:
-            anomaly: Detected anomaly
-            context: Data context
+        prompt = f"""Analyze this data anomaly:
 
-        Returns:
-            Prompt for LLM
-        """
-        data_type = context.get('data_type', 'unknown')
-        data_purpose = context.get('data_purpose', 'unknown')
+Dataset: {len(df)} rows
+Column: {anomaly.column_name}
+Anomaly Type: {anomaly.anomaly_type.value}
+Severity: {anomaly.severity}/4
+Value: {anomaly.value}
 
-        prompt = f"""Analyze this data anomaly and provide root cause analysis:
+Column Stats:
+- Mean: {col_data.mean():.2f}
+- Median: {col_data.median():.2f}
+- Std Dev: {col_data.std():.2f}
+- Unique: {col_data.n_unique()}
 
-ANOMALY DETAILS:
-- Type: {anomaly.anomaly_type.value}
-- Column: {anomaly.column_name}
-- Value: {anomaly.value}
-- Expected: {anomaly.expected_range}
-- Severity: {anomaly.severity.name}
-- Initial Explanation: {anomaly.explanation}
+Provide the most likely root cause in 1-2 sentences."""
 
-CONTEXT:
-- Data Type: {data_type}
-- Data Purpose: {data_purpose}
-- Confidence: {anomaly.confidence:.1%}
-
-Please provide:
-1. Most probable root causes (3-5)
-2. Detailed explanation of why this occurred
-3. Recommended remediation steps (2-3)
-
-Format as:
-ROOT CAUSES:
-- [cause 1]
-- [cause 2]
-
-EXPLANATION:
-[explanation]
-
-REMEDIATION:
-- [step 1]
-- [step 2]
-"""
         return prompt
 
-    def _extract_causes(self, llm_response: str) -> List[str]:
+    def analyze_batch(self, df: pl.DataFrame, anomalies: List[Anomaly]) -> Dict[str, RootCause]:
         """
-        Extract probable causes from LLM response.
+        Analyze multiple anomalies.
 
         Args:
-            llm_response: LLM generated response
+            df: DataFrame being analyzed
+            anomalies: List of Anomaly objects
 
         Returns:
-            List of probable causes
+            Dictionary mapping anomaly ID to RootCause
         """
-        causes = []
+        results = {}
+        for anomaly in anomalies:
+            try:
+                results[anomaly.id] = self.analyze(df, anomaly)
+            except Exception as e:
+                self.logger.error(f"Failed to analyze anomaly {anomaly.id}: {e}")
+                results[anomaly.id] = self._analyze_heuristic(df, anomaly)
 
-        try:
-            if 'ROOT CAUSES:' in llm_response:
-                causes_section = llm_response.split('ROOT CAUSES:')[1].split('EXPLANATION:')[0]
-                for line in causes_section.split('\n'):
-                    line = line.strip()
-                    if line.startswith('-'):
-                        cause = line.lstrip('-').strip()
-                        if cause:
-                            causes.append(cause)
-
-            return causes if causes else ["Unable to parse causes from LLM response"]
-
-        except Exception as e:
-            logger.debug(f"Error extracting causes: {e}")
-            return []
-
-    def _extract_remediation(self, llm_response: str) -> List[str]:
-        """
-        Extract remediation steps from LLM response.
-
-        Args:
-            llm_response: LLM generated response
-
-        Returns:
-            List of remediation steps
-        """
-        steps = []
-
-        try:
-            if 'REMEDIATION:' in llm_response:
-                remediation_section = llm_response.split('REMEDIATION:')[1]
-                for line in remediation_section.split('\n'):
-                    line = line.strip()
-                    if line.startswith('-'):
-                        step = line.lstrip('-').strip()
-                        if step:
-                            steps.append(step)
-
-            return steps[:3]  # Limit to 3 steps
-
-        except Exception as e:
-            logger.debug(f"Error extracting remediation: {e}")
-            return []
-
-    def _generate_probable_causes(
-        self,
-        anomaly: Anomaly,
-        context: Dict[str, Any],
-    ) -> List[str]:
-        """
-        Generate probable causes using heuristics.
-
-        Args:
-            anomaly: Detected anomaly
-            context: Data context
-
-        Returns:
-            List of probable causes
-        """
-        causes = []
-
-        # Generic causes based on anomaly type
-        if anomaly.anomaly_type.name == 'OUTLIER':
-            causes.append("Data entry error or typo")
-            causes.append("Temporary system anomaly during data collection")
-            causes.append("Legitimate business event (seasonal spike, promotion, etc.)")
-
-        elif anomaly.anomaly_type.name == 'BEHAVIORAL_SHIFT':
-            causes.append("Change in underlying process or source system")
-            causes.append("External event impacting data generation")
-            causes.append("Incomplete or corrupted data batch")
-
-        elif anomaly.anomaly_type.name == 'CONTEXTUAL':
-            causes.append("Unexpected correlation in data")
-            causes.append("Third-party data enrichment issue")
-            causes.append("Regression in upstream data quality")
-
-        return causes
-
-    def _generate_explanation(
-        self,
-        anomaly: Anomaly,
-        probable_causes: List[str],
-    ) -> str:
-        """
-        Generate explanation using heuristics.
-
-        Args:
-            anomaly: Detected anomaly
-            probable_causes: List of probable causes
-
-        Returns:
-            Explanation string
-        """
-        explanation = f"{anomaly.explanation}\n\nProbable causes: {', '.join(probable_causes)}"
-        return explanation
-
-    def _generate_remediation(
-        self,
-        anomaly: Anomaly,
-        probable_causes: List[str],
-    ) -> List[str]:
-        """
-        Generate remediation steps using heuristics.
-
-        Args:
-            anomaly: Detected anomaly
-            probable_causes: List of probable causes
-
-        Returns:
-            List of remediation steps
-        """
-        steps = []
-
-        # Generic remediation based on severity
-        if anomaly.severity == AnomalySeverity.CRITICAL:
-            steps.append(f"Immediately investigate row/column: {anomaly.column_name}")
-            steps.append("Contact data source team for verification")
-            steps.append("Escalate to data quality team")
-
-        elif anomaly.severity == AnomalySeverity.HIGH:
-            steps.append(f"Review data quality of '{anomaly.column_name}'")
-            steps.append("Verify source system for issues")
-            steps.append("Consider data validation rules")
-
-        else:
-            steps.append("Log anomaly for trend analysis")
-            steps.append("Monitor for recurrence")
-
-        return steps
+        return results

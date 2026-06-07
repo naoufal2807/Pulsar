@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime, timedelta
 
-from .anomaly_detector import Anomaly, AnomalyType, AnomalySeverity
+from .models import Anomaly, AnomalyType, Trend
 
 logger = logging.getLogger(__name__)
 
