@@ -327,11 +327,21 @@ def infer(
         # Use Agent for deep reasoning
         logger.debug("Requesting agent reasoning about patterns")
 
+        # Format entities and metrics for the agent
+        entities_list = []
+        for col, values in intelligence['entities'].items():
+            if values:
+                entities_list.append(f"{col}: {', '.join(str(v) for v in values[:2])}")
+        entities_str = "; ".join(entities_list[:3]) if entities_list else "various"
+
+        metrics_list = list(intelligence['key_metrics'].keys())[:3] if intelligence.get('key_metrics') else []
+        metrics_str = ", ".join(metrics_list) if metrics_list else "various metrics"
+
         # Let agent reason about domain and key patterns
         domain_analysis = agent.think(
             f"Analyze this data: Domain={intelligence['domain']}, "
-            f"Entities={', '.join(intelligence['entities'][:3])}, "
-            f"Key metrics={', '.join(intelligence['key_metrics'][:3])}. "
+            f"Key entities={entities_str}, "
+            f"Key metrics={metrics_str}. "
             f"What does this data represent and what insights can we draw?"
         )
         logger.info("Agent reasoning complete")
