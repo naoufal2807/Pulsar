@@ -20,12 +20,12 @@ import logging
 from datetime import datetime
 from dataclasses import dataclass
 import json
-import re
 
 import polars as pl
 
 from pulsar.core.diagnosis.llm_base import LLMProvider, LLMConfig, LLMProviderType, get_llm_provider
 from pulsar.core.intelligence.tools import ToolRegistry, create_default_registry
+from pulsar.core.intelligence.function_calls import FunctionCallParser, create_function_definitions
 
 logger = logging.getLogger(__name__)
 
@@ -119,13 +119,9 @@ class Agent:
             "Provide reasoning for your analysis."
         )
 
-        # Add tool calling instructions if tools enabled
+        # Add function calling instructions if tools enabled
         if self.tools_enabled and self.tool_registry:
-            prompt += "\n\nYou have access to the following tools:"
-            for tool_schema in self.tool_registry.get_schemas():
-                prompt += f"\n- {tool_schema['name']}: {tool_schema['description']}"
-            prompt += "\n\nWhen you need to analyze data, call tools like: [TOOL: tool_name(param1=value1, param2=value2)]"
-            prompt += "\nAfter calling a tool, you will see the result. Use that result in your analysis."
+            prompt += "\n\n" + create_function_definitions()
 
         return prompt
 
@@ -160,10 +156,15 @@ class Agent:
                 # Get response from LLM
                 response = self.llm_provider.generate(prompt)
 
-                # Check if response contains tool calls
-                if "[TOOL:" in response and self.tools_enabled:
-                    # Execute tool calls
-                    tool_results = self._execute_tool_calls(response)
+                # Check if response contains function calls (JSON format)
+                logger.debug(f"LLM Response (first 200 chars): {response[:200]}")
+                has_calls = FunctionCallParser.response_has_function_calls(response)
+                logger.debug(f"Function calls detected: {has_calls}")
+
+                if has_calls and self.tools_enabled:
+                    logger.info("Function calls detected - parsing and executing")
+                    # Parse and execute function calls
+                    tool_results = self._execute_function_calls(response)
 
                     if tool_results:
                         # Ask LLM to use tool results
@@ -326,104 +327,52 @@ class Agent:
             'session_duration': (datetime.now() - self.session_start).total_seconds(),
         }
 
-    def _execute_tool_calls(self, response: str) -> Optional[Dict[str, Any]]:
+    def _execute_function_calls(self, response: str) -> Optional[Dict[str, Any]]:
         """
-        Parse and execute tool calls from LLM response.
+        Parse and execute function calls from LLM response.
 
-        Tool call format: [TOOL: tool_name(param1=value1, param2=value2)]
+        Function call format (JSON):
+        {
+          "function": "compute_statistics",
+          "parameters": {"column": "sales"}
+        }
 
         Args:
-            response: LLM response potentially containing tool calls
+            response: LLM response potentially containing function calls
 
         Returns:
-            Dictionary with tool results
+            Dictionary with function results
         """
         if not self.tool_registry:
             return None
 
-        # Pattern to find tool calls: [TOOL: tool_name(args)]
-        pattern = r'\[TOOL:\s*(\w+)\((.*?)\)\]'
-        matches = re.findall(pattern, response)
+        try:
+            # Parse function calls from response
+            function_calls = FunctionCallParser.extract_function_calls(response)
 
-        if not matches:
-            return None
+            if not function_calls:
+                logger.debug("No function calls found in response")
+                return None
 
-        results = {}
+            logger.info(f"Found {len(function_calls)} function call(s)")
+            results = {}
 
-        for tool_name, args_str in matches:
-            try:
-                # Parse arguments
-                args = self._parse_tool_args(args_str)
-                logger.debug(f"Executing tool: {tool_name} with args: {args}")
-
-                # Call tool
-                result = self.tool_registry.call(tool_name, **args)
-                results[tool_name] = result
-
-                logger.info(f"Tool executed: {tool_name}")
-
-            except Exception as e:
-                logger.error(f"Tool execution failed ({tool_name}): {e}")
-                results[tool_name] = {'error': str(e)}
-
-        return results if results else None
-
-    def _parse_tool_args(self, args_str: str) -> Dict[str, Any]:
-        """
-        Parse tool arguments from string format.
-
-        Handles: param1=value1, param2="string value", param3=123
-
-        Args:
-            args_str: Arguments string
-
-        Returns:
-            Dictionary of parsed arguments
-        """
-        args = {}
-
-        # Split by comma, but be careful with quoted strings
-        parts = []
-        current = ""
-        in_quotes = False
-
-        for char in args_str:
-            if char == '"':
-                in_quotes = not in_quotes
-            if char == ',' and not in_quotes:
-                parts.append(current.strip())
-                current = ""
-            else:
-                current += char
-
-        if current:
-            parts.append(current.strip())
-
-        # Parse each part as key=value
-        for part in parts:
-            if '=' not in part:
-                continue
-
-            key, value = part.split('=', 1)
-            key = key.strip()
-            value = value.strip()
-
-            # Try to parse value
-            if value.startswith('"') and value.endswith('"'):
-                # String
-                args[key] = value[1:-1]
-            elif value.lower() in ('true', 'false'):
-                # Boolean
-                args[key] = value.lower() == 'true'
-            else:
-                # Try number
+            for call in function_calls:
                 try:
-                    if '.' in value:
-                        args[key] = float(value)
-                    else:
-                        args[key] = int(value)
-                except ValueError:
-                    # Keep as string
-                    args[key] = value
+                    logger.debug(f"Executing function: {call.function} with params: {call.parameters}")
 
-        return args
+                    # Call function via tool registry
+                    result = self.tool_registry.call(call.function, **call.parameters)
+                    results[call.function] = result
+
+                    logger.info(f"Function executed successfully: {call.function}")
+
+                except Exception as e:
+                    logger.error(f"Function execution failed ({call.function}): {e}")
+                    results[call.function] = {'error': str(e)}
+
+            return results if results else None
+
+        except Exception as e:
+            logger.error(f"Error parsing function calls: {e}")
+            return None
