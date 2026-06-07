@@ -278,5 +278,83 @@ def baseline(
         logger.error(f"Unexpected error: {e}", exc_info=True)
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
+
+
+@app.command()
+def infer(
+    file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
+    output: str = typer.Option("markdown", help="Output format: markdown, json"),
+    save: bool = typer.Option(False, "--save", help="Save report to file"),
+    log_file: Optional[str] = typer.Option(None, help="Log file path"),
+):
+    """Infer intelligence about your data using Small World Framework."""
+    log_path = setup_logging(log_file or "logs")
+    logger.info(f"Infer command: file={file}, output={output}")
+
+    try:
+        from pulsar.core.intelligence.small_world.isolator import Isolator
+        from pulsar.core.intelligence.small_world.learner import Learner
+        from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
+        from pulsar.core.intelligence.small_world.report_generator import IntelligenceReportGenerator
+
+        # Load data
+        lf = load(file)
+        df = lf.collect()
+        dataset_name = Path(file).stem
+        logger.info(f"File loaded: {file}")
+
+        # Small World Framework: Learn in isolation
+        logger.debug("Starting Small World Framework")
+        isolator = Isolator()
+        sample = isolator.extract(df, strategy='random')
+        logger.debug(f"Isolated sample: {len(sample)} rows")
+
+        learner = Learner()
+        patterns = learner.learn(sample)
+        logger.debug("Patterns discovered")
+
+        # Generate intelligence
+        intel_gen = IntelligenceGenerator(df, patterns)
+        intelligence = intel_gen.generate_intelligence()
+        logger.info("Intelligence generated")
+
+        # Format output
+        if output == "json":
+            # Convert to JSON-serializable format
+            intel_json = {
+                'domain': intelligence['domain'],
+                'entities': intelligence['entities'],
+                'key_metrics': intelligence['key_metrics'],
+                'top_performers': intelligence['top_performers'],
+                'patterns_discovered': intelligence['patterns_discovered'],
+                'outliers_meaning': intelligence['outliers_meaning'],
+                'concentration': intelligence['concentration'],
+                'summary': intelligence['summary_statement'],
+            }
+            report_text = json.dumps(intel_json, indent=2, default=str)
+        else:  # markdown
+            report_gen = IntelligenceReportGenerator(dataset_name, intelligence)
+            report_text = report_gen.generate_report()
+
+        # Output
+        if save:
+            report_path = Path(f"intelligence_reports/{dataset_name}_intelligence.md")
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(report_text)
+            print(f"\n[OK] Intelligence report saved: {report_path}\n")
+            logger.info(f"Report saved: {report_path}")
+        else:
+            print(report_text)
+
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        typer.echo(f"[ERROR] {e}", err=True)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        logger.error(f"Inference error: {e}", exc_info=True)
+        typer.echo(f"[ERROR] {e}", err=True)
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
