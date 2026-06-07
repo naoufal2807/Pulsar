@@ -87,8 +87,8 @@ class DataExplorationJourney:
         ]
 
         # Get sample data to provide concrete context
-        sample = self.df.head(5)
-        first_row = dict(sample[0])
+        sample = self.df.head(1)
+        first_row = sample.row(0, named=True)
 
         prompt = (
             f"SCOUT STAGE: Provide a CONCRETE, SPECIFIC overview of '{self.dataset_name}'.\n\n"
@@ -103,7 +103,8 @@ class DataExplorationJourney:
             f"Do NOT say 'I'm ready to analyze'. Give SPECIFIC insights about this data RIGHT NOW."
         )
 
-        overview = self.agent.think(prompt)
+        # Allow multiple iterations for tool calling
+        overview = self.agent.think(prompt, max_iterations=5)
 
         insights = [
             f"Dataset contains {self.df.height:,} rows and {self.df.width} columns",
