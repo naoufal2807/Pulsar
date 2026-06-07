@@ -287,7 +287,7 @@ def infer(
     save: bool = typer.Option(False, "--save", help="Save report to file"),
     log_file: Optional[str] = typer.Option(None, help="Log file path"),
 ):
-    """Infer intelligence about your data using Small World Framework."""
+    """Infer intelligence about your data using Small World Framework + Agent reasoning."""
     log_path = setup_logging(log_file or "logs")
     logger.info(f"Infer command: file={file}, output={output}")
 
@@ -296,12 +296,18 @@ def infer(
         from pulsar.core.intelligence.small_world.learner import Learner
         from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
         from pulsar.core.intelligence.small_world.report_generator import IntelligenceReportGenerator
+        from pulsar.core.intelligence.agent import Agent
 
         # Load data
         lf = load(file)
         df = lf.collect()
         dataset_name = Path(file).stem
         logger.info(f"File loaded: {file}")
+
+        # Initialize Agent for LLM-powered reasoning
+        logger.debug("Initializing reasoning agent")
+        agent = Agent()
+        logger.info(f"Agent initialized - Provider available: {agent.provider_available}")
 
         # Small World Framework: Learn in isolation
         logger.debug("Starting Small World Framework")
@@ -318,7 +324,19 @@ def infer(
         intelligence = intel_gen.generate_intelligence()
         logger.info("Intelligence generated")
 
-        # Generate deep analysis
+        # Use Agent for deep reasoning
+        logger.debug("Requesting agent reasoning about patterns")
+
+        # Let agent reason about domain and key patterns
+        domain_analysis = agent.think(
+            f"Analyze this data: Domain={intelligence['domain']}, "
+            f"Entities={', '.join(intelligence['entities'][:3])}, "
+            f"Key metrics={', '.join(intelligence['key_metrics'][:3])}. "
+            f"What does this data represent and what insights can we draw?"
+        )
+        logger.info("Agent reasoning complete")
+
+        # Generate deep analysis with agent insights
         from pulsar.core.intelligence.small_world.deep_analyzer import DeepAnalyzer
 
         deep_analyzer = DeepAnalyzer(df, patterns, intelligence)
@@ -328,8 +346,14 @@ def infer(
             'variability': deep_analyzer.analyze_variability(),
             'relationships': deep_analyzer.analyze_relationships(),
             'risks': deep_analyzer.analyze_data_quality_risks(),
+            'agent_insights': domain_analysis,
         }
-        logger.info("Deep analysis generated")
+        logger.info("Deep analysis + agent reasoning complete")
+
+        # Export session before clearing memory
+        session_export = agent.export_session()
+        agent.clear_memory()
+        logger.info(f"Agent session exported and memory cleared")
 
         # Format output
         if output == "json":
@@ -343,6 +367,8 @@ def infer(
                 'outliers_meaning': intelligence['outliers_meaning'],
                 'concentration': intelligence['concentration'],
                 'summary': intelligence['summary_statement'],
+                'agent_insights': domain_analysis,
+                'agent_message_count': session_export['total_messages'],
             }
             report_text = json.dumps(intel_json, indent=2, default=str)
         else:  # markdown
