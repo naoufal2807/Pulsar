@@ -318,6 +318,19 @@ def infer(
         intelligence = intel_gen.generate_intelligence()
         logger.info("Intelligence generated")
 
+        # Generate deep analysis
+        from pulsar.core.intelligence.small_world.deep_analyzer import DeepAnalyzer
+
+        deep_analyzer = DeepAnalyzer(df, patterns, intelligence)
+        deep_analysis = {
+            'concentration': deep_analyzer.analyze_concentration(),
+            'distribution': deep_analyzer.analyze_distribution_skewness(),
+            'variability': deep_analyzer.analyze_variability(),
+            'relationships': deep_analyzer.analyze_relationships(),
+            'risks': deep_analyzer.analyze_data_quality_risks(),
+        }
+        logger.info("Deep analysis generated")
+
         # Format output
         if output == "json":
             # Convert to JSON-serializable format
@@ -333,7 +346,9 @@ def infer(
             }
             report_text = json.dumps(intel_json, indent=2, default=str)
         else:  # markdown
-            report_gen = IntelligenceReportGenerator(dataset_name, intelligence)
+            report_gen = IntelligenceReportGenerator(
+                dataset_name, intelligence, df=df, patterns=patterns, deep_analysis=deep_analysis
+            )
             report_text = report_gen.generate_report()
 
         # Output

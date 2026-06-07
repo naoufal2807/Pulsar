@@ -2,29 +2,45 @@
 """
 Report Generator: Create detailed markdown intelligence reports.
 
-Transforms agent's learned knowledge into comprehensive markdown documentation.
+Transforms agent's learned knowledge into comprehensive markdown documentation
+with deep reasoning and strategic analysis.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from datetime import datetime
 import logging
+
+import polars as pl
 
 logger = logging.getLogger(__name__)
 
 
 class IntelligenceReportGenerator:
-    """Generate detailed markdown intelligence reports."""
+    """Generate detailed markdown intelligence reports with deep analysis."""
 
-    def __init__(self, dataset_name: str, intelligence: Dict[str, Any]):
+    def __init__(
+        self,
+        dataset_name: str,
+        intelligence: Dict[str, Any],
+        df: Optional[pl.DataFrame] = None,
+        patterns: Optional[Dict[str, Any]] = None,
+        deep_analysis: Optional[Dict[str, Any]] = None,
+    ):
         """
         Initialize report generator.
 
         Args:
             dataset_name: Name of the dataset
             intelligence: Intelligence dictionary from IntelligenceGenerator
+            df: Optional DataFrame for deep analysis
+            patterns: Optional patterns dictionary
+            deep_analysis: Optional pre-computed deep analysis
         """
         self.dataset_name = dataset_name
         self.intelligence = intelligence
+        self.df = df
+        self.patterns = patterns or {}
+        self.deep_analysis = deep_analysis or {}
         self.generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def generate_report(self) -> str:
@@ -65,6 +81,14 @@ class IntelligenceReportGenerator:
 
         # Concentration Analysis
         report.append(self._concentration_section())
+
+        # Deep Analysis Sections
+        if self.deep_analysis:
+            report.append(self._concentration_deep_analysis())
+            report.append(self._distribution_analysis())
+            report.append(self._variability_analysis())
+            report.append(self._relationships_analysis())
+            report.append(self._risk_analysis())
 
         # Recommendations
         report.append(self._recommendations_section())
@@ -197,6 +221,123 @@ class IntelligenceReportGenerator:
             section.append("Concentration analysis not available.\n")
 
         section.append("")
+        return "\n".join(section)
+
+    def _concentration_deep_analysis(self) -> str:
+        """Generate deep analysis of concentration."""
+        section = []
+        section.append("## Deep Analysis: Market Concentration\n")
+
+        conc = self.deep_analysis.get('concentration', {})
+        if conc:
+            section.append(f"**Level**: {conc.get('concentration_level', 'Unknown')}\n\n")
+            section.append(f"**HHI Index**: {conc.get('herfindahl_index', 0):.3f}\n\n")
+            section.append(f"**Reasoning**:\n{conc.get('reasoning', 'N/A')}\n\n")
+
+            implications = conc.get('implications', [])
+            if implications:
+                section.append("**Business Implications**:\n")
+                for impl in implications:
+                    section.append(f"- {impl}\n")
+                section.append("")
+
+            opportunities = conc.get('opportunities', [])
+            if opportunities:
+                section.append("**Strategic Opportunities**:\n")
+                for opp in opportunities:
+                    section.append(f"- {opp}\n")
+                section.append("")
+
+        return "\n".join(section)
+
+    def _distribution_analysis(self) -> str:
+        """Generate analysis of distribution patterns."""
+        section = []
+        section.append("## Deep Analysis: Distribution Patterns\n")
+
+        dist = self.deep_analysis.get('distribution', {})
+        if dist:
+            section.append(f"**Pattern**: {dist.get('overall_pattern', 'N/A')}\n\n")
+            section.append(f"**Business Meaning**: {dist.get('business_meaning', 'N/A')}\n\n")
+
+            skewed = dist.get('skewed_columns', [])
+            if skewed:
+                section.append("**Skewed Metrics**:\n")
+                for col_data in skewed[:5]:
+                    section.append(f"- {col_data['column']}: {col_data['interpretation']}\n")
+                section.append("")
+
+        return "\n".join(section)
+
+    def _variability_analysis(self) -> str:
+        """Generate analysis of variability."""
+        section = []
+        section.append("## Deep Analysis: Consistency & Stability\n")
+
+        var = self.deep_analysis.get('variability', {})
+        if var:
+            stable = var.get('stable_columns', [])
+            volatile = var.get('volatile_columns', [])
+
+            if stable:
+                section.append(f"**Stable Metrics**: {', '.join(stable)}\n")
+                section.append("Use these for forecasting and planning - they are predictable.\n\n")
+
+            if volatile:
+                section.append(f"**Volatile Metrics**: {', '.join(volatile)}\n")
+                section.append("These require risk management and contingency planning.\n\n")
+
+            implications = var.get('implications', [])
+            for impl in implications:
+                section.append(f"- {impl}\n")
+
+        return "\n".join(section)
+
+    def _relationships_analysis(self) -> str:
+        """Generate analysis of relationships."""
+        section = []
+        section.append("## Deep Analysis: Key Relationships\n")
+
+        rel = self.deep_analysis.get('relationships', {})
+        if rel:
+            strong_rels = rel.get('strong_relationships', [])
+
+            if strong_rels:
+                section.append(f"**Found {len(strong_rels)} strong relationships**:\n\n")
+                for r in strong_rels[:5]:
+                    section.append(
+                        f"- **{r.get('variable_1')} <-> {r.get('variable_2')}**: "
+                        f"Correlation {r.get('correlation'):.2f}\n"
+                    )
+                    section.append(f"  - {r.get('interpretation')}\n")
+                    section.append(f"  - Causation likelihood: {r.get('causation_likelihood')}\n\n")
+
+            insights = rel.get('strategic_insights', [])
+            if insights:
+                section.append("**Strategic Insights**:\n")
+                for insight in insights:
+                    section.append(f"- {insight}\n")
+
+        return "\n".join(section)
+
+    def _risk_analysis(self) -> str:
+        """Generate data quality risk analysis."""
+        section = []
+        section.append("## Data Quality Risk Assessment\n")
+
+        risks = self.deep_analysis.get('risks', {})
+        if risks:
+            overall = risks.get('overall_risk_level', 'UNKNOWN')
+            section.append(f"**Overall Risk Level**: {overall}\n\n")
+
+            risk_list = risks.get('risks', [])
+            if risk_list:
+                section.append("**Identified Risks**:\n\n")
+                for risk in risk_list:
+                    section.append(f"### {risk.get('risk')} ({risk.get('severity')})\n")
+                    section.append(f"{risk.get('description')}\n\n")
+                    section.append(f"**Mitigation**: {risk.get('mitigation')}\n\n")
+
         return "\n".join(section)
 
     def _recommendations_section(self) -> str:
