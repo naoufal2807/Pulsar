@@ -1,5 +1,64 @@
-polars>=0.20.0
+# requirements.txt - Pulsar 2.0 Dependencies
+
+# Core Data Processing
+polars>=0.19.0
+pandas>=1.5.0
+numpy>=1.23.0
+
+# CLI & Web Framework
 typer>=0.9.0
-pytest>=7.4.0
-pyyaml
-setuptools
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+
+# Configuration
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-asyncio>=0.21.0
+hypothesis>=6.70.0
+
+# Logging & Monitoring
+python-json-logger>=2.0.0
+structlog>=22.1.0
+
+# LLM Integration (Ollama/Gemma)
+requests>=2.31.0
+httpx>=0.24.0
+ollama>=0.0.11
+
+# Optional: Transformers for local LLM
+transformers>=4.30.0
+torch>=2.0.0
+
+# Optional: Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.11.0
+
+# Optional: Caching
+redis>=4.5.0
+
+# Optional: Jupyter
+jupyter>=1.0.0
+ipython>=8.10.0
+notebook>=6.5.0
+
+# Code Quality
+black>=23.0.0
+flake8>=6.0.0
+isort>=5.12.0
+mypy>=1.0.0
+pylint>=2.17.0
+
+# Documentation
+mkdocs>=1.4.0
+mkdocs-material>=9.0.0
+
+# Development
+ipdb>=0.13.0
+rich>=13.0.0
+click>=8.1.0

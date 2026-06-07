@@ -1,0 +1,10 @@
+rules:
+  - name: "user_id_unique"
+    column: "user_id"
+    type: "unique"
+    threshold: 1.0
+  
+  - name: "email_not_null"
+    column: "email"
+    type: "not_null"
+    threshold: 1.0

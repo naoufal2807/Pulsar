@@ -1,0 +1,82 @@
+{
+  "summary": {
+    "total_columns": 8,
+    "columns_with_drift": 0,
+    "drift_percentage": 0.0,
+    "overall_drift_score": 0.0,
+    "severity": "NONE",
+    "new_columns": [],
+    "deleted_columns": [],
+    "type_changes": []
+  },
+  "column_drift": {
+    "Channel ID": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    },
+    "Total Videos": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    },
+    "Subscribers": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    },
+    "Country": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    },
+    "Total Views": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    },
+    "Description": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    },
+    "Global Rank": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    },
+    "Channel Name": {
+      "drift_detected": false,
+      "drift_score": 0.0,
+      "severity": "NONE",
+      "changes": {},
+      "alerts": []
+    }
+  },
+  "metadata": {
+    "dataset_name": "global_top4k",
+    "file_path": "global_top4k.csv",
+    "comparison_timestamp": "2026-05-10T16:59:45.702312",
+    "comparison_date": "2026-05-10",
+    "comparison_time": "16:59:45",
+    "baseline_file": "baselines\\global_top4k_20260510_165739.baseline.json",
+    "baseline_timestamp": "2026-05-10T16:57:39.884446",
+    "time_elapsed_seconds": 125,
+    "pulsar_version": "0.2.0",
+    "session_id": "99a30ad5"
+  }
+}

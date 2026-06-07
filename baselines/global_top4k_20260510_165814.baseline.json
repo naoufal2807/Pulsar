@@ -1,0 +1,303 @@
+{
+  "metadata": {
+    "dataset_name": "global_top4k",
+    "file_path": "global_top4k.csv",
+    "baseline_timestamp": "2026-05-10T16:58:14.390418",
+    "baseline_date": "2026-05-10",
+    "baseline_time": "16:58:14",
+    "pulsar_version": "0.2.0",
+    "session_id": "67742a78"
+  },
+  "dataset_profile": {
+    "dataset_name": "global_top4k.csv",
+    "path": "global_top4k.csv",
+    "row_count": 3964,
+    "column_count": 8,
+    "columns": {
+      "Global Rank": {
+        "position": 0,
+        "dtype": "Int64",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 3963,
+        "uniqueness": 0.9997,
+        "cardinality_ratio": 0.9997,
+        "sample_values": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "numeric_stats": {
+          "min": 1.0,
+          "max": 3964.0,
+          "mean": 1982.4994954591323,
+          "std": 1144.4534163763992,
+          "p25": 992.0,
+          "p50": 1983.0,
+          "p75": 2973.0,
+          "p90": 3568.0,
+          "p99": 3924.0,
+          "skewness": -2.4692845569211315e-06,
+          "kurtosis": -1.1999969671244788,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 0,
+              "outlier_percentage": 0.0,
+              "lower_bound": -1981.0,
+              "upper_bound": 5947.0
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 0,
+              "outlier_percentage": 0.0
+            }
+          },
+          "iqr_stats": {
+            "q1": 992.0,
+            "q3": 2974.0,
+            "iqr": 1982
+          }
+        }
+      },
+      "Channel ID": {
+        "position": 1,
+        "dtype": "String",
+        "non_null_count": 3963,
+        "null_count": 1,
+        "completeness": 0.9997,
+        "distinct_count": 3964,
+        "uniqueness": 1.0003,
+        "cardinality_ratio": 1.0,
+        "sample_values": [
+          "UCJ2ZDzMRgSrxmwphstrm8Ww",
+          "UCNdtVmqxTbuxDCcc_KPKYjQ",
+          "UCTifUC9kxlUu-5lg9kZT3mg",
+          "UC5dBH0SxFcLfAXf2LTewyrw",
+          "UC9_krwU8wTPCZRKaf34QnPw"
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      },
+      "Channel Name": {
+        "position": 2,
+        "dtype": "String",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 3954,
+        "uniqueness": 0.9975,
+        "cardinality_ratio": 0.9975,
+        "sample_values": [
+          "OT\u00c1VIO GAMER FELIX",
+          "BAC Bboss ",
+          "jackfrags",
+          "rezon ay",
+          "DJHatesGames"
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      },
+      "Subscribers": {
+        "position": 3,
+        "dtype": "Int64",
+        "non_null_count": 3963,
+        "null_count": 1,
+        "completeness": 0.9997,
+        "distinct_count": 2132,
+        "uniqueness": 0.538,
+        "cardinality_ratio": 0.5378,
+        "sample_values": [
+          "0",
+          "1",
+          "2",
+          "4",
+          "5"
+        ],
+        "numeric_stats": {
+          "min": 0.0,
+          "max": 474000000.0,
+          "mean": 2253065.7585162753,
+          "std": 11920496.243672322,
+          "p25": 65100.0,
+          "p50": 343000.0,
+          "p75": 1330000.0,
+          "p90": 4200000.0,
+          "p99": 27000000.0,
+          "skewness": 23.417891580301806,
+          "kurtosis": 766.1989949777397,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 503,
+              "outlier_percentage": 12.69,
+              "lower_bound": -1832500.0,
+              "upper_bound": 3227500.0
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 30,
+              "outlier_percentage": 0.76
+            }
+          },
+          "iqr_stats": {
+            "q1": 65000.0,
+            "q3": 1330000.0,
+            "iqr": 1265000
+          }
+        }
+      },
+      "Total Views": {
+        "position": 4,
+        "dtype": "Int64",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 3963,
+        "uniqueness": 0.9997,
+        "cardinality_ratio": 0.9997,
+        "sample_values": [
+          "0",
+          "11",
+          "37",
+          "5652",
+          "10975"
+        ],
+        "numeric_stats": {
+          "min": 0.0,
+          "max": 335650634349.0,
+          "mean": 1220082708.0908175,
+          "std": 7981917702.844633,
+          "p25": 25936051.0,
+          "p50": 135328207.0,
+          "p75": 588746626.0,
+          "p90": 2060744004.0,
+          "p99": 16349386612.0,
+          "skewness": 25.782707198817803,
+          "kurtosis": 899.9455128995183,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 526,
+              "outlier_percentage": 13.27,
+              "lower_bound": -819162558.5,
+              "upper_bound": 1434433733.5
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 28,
+              "outlier_percentage": 0.71
+            }
+          },
+          "iqr_stats": {
+            "q1": 25936051.0,
+            "q3": 589335124.0,
+            "iqr": 563399073
+          }
+        }
+      },
+      "Total Videos": {
+        "position": 5,
+        "dtype": "Int64",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 2082,
+        "uniqueness": 0.5252,
+        "cardinality_ratio": 0.5252,
+        "sample_values": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "numeric_stats": {
+          "min": 0.0,
+          "max": 541883.0,
+          "mean": 2121.6215943491425,
+          "std": 14379.953625169366,
+          "p25": 140.0,
+          "p50": 611.0,
+          "p75": 1843.0,
+          "p90": 3724.0,
+          "p99": 13283.0,
+          "skewness": 26.001977898208658,
+          "kurtosis": 789.848318261995,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 289,
+              "outlier_percentage": 7.29,
+              "lower_bound": -2417.5,
+              "upper_bound": 4402.5
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 15,
+              "outlier_percentage": 0.38
+            }
+          },
+          "iqr_stats": {
+            "q1": 140.0,
+            "q3": 1845.0,
+            "iqr": 1705
+          }
+        }
+      },
+      "Country": {
+        "position": 6,
+        "dtype": "String",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 83,
+        "uniqueness": 0.0209,
+        "cardinality_ratio": 0.0209,
+        "sample_values": [
+          "CZ",
+          "PK",
+          "IL",
+          "NG",
+          "TH"
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      },
+      "Description": {
+        "position": 7,
+        "dtype": "String",
+        "non_null_count": 3457,
+        "null_count": 507,
+        "completeness": 0.8721,
+        "distinct_count": 3426,
+        "uniqueness": 0.991,
+        "cardinality_ratio": 0.8643,
+        "sample_values": [
+          "Hello \ud83d\udc4b  \u090f\u0935\u0930\u0940\u0935\u0928 \u092e\u0948\u0902 \u0928\u0940\u0930\u091c \u0915\u0941\u092e\u093e\u0930 \u0914\u0930 \u0907\u0938 \u0915\u0949\u092e\u0947\u0902\u091f \u0915\u094b \u0924\u0941\u092e \u0932\u094b\u0917 \u092b\u0942\u0932 \u092a\u0922\u093c\u0915\u0930 \u091c\u093e\u0928\u093e \u0924\u092c \u092e\u0948\u0902 \u0906\u092a \u0932\u094b\u0917 \u092a\u0930 \u090f\u0915 \u092c\u093e\u0924 \u092c\u0924\u093e \u0930\u0939\u093e \u0939\u0942\u0902 \u0924\u0941\u092e \u0932\u094b\u0917 \u092d\u0940 \u092f\u0942\u091f\u094d\u092f\u0942\u092c \u0915\u0947 \u0926\u0941\u0928\u093f\u092f\u093e \u092e\u0947\u0902 \u0915\u092e \u0930\u0916\u094b \u092e\u0947\u0930\u0947 \u092d\u093e\u0908 \u0914\u0930 \u092a\u0922\u093c\u093e\u0908 \u0932\u093f\u0916\u093e\u0908 \u0938\u0947 \u0915\u0941\u091b \u0939\u094b\u0928\u0947 \u0935\u093e\u0932\u093e \u092a\u0922\u093c\u093e\u0908 \u0932\u093f\u0916\u093e\u0908 \u0938\u0947 \u0915\u0941\u091b \u0939\u094b\u0928\u0947 \u0935\u093e\u0932\u093e \u092d\u0940 \u0928\u0939\u0940\u0902 \u0939\u0948 \u0915\u094d\u092f\u094b\u0902\u0915\u093f \u0928\u094c\u0915\u0930\u0940 \u092c\u093f\u0928\u093e \u092a\u0948\u0938\u0947 \u0915\u0947 \u0928\u0939\u0940\u0902 \u0932\u0917\u0924\u093e \u0939\u0948 \u092e\u0947\u0930\u0947 \u092d\u093e\u0908 \u0907\u0938\u0932\u093f\u090f \u0924\u0941\u092e \u0932\u094b\u0917 \u0938\u0947 \u0928\u093f\u0935\u0947\u0926\u0928 \u0939\u0948 \u092d\u093e\u0908 \u0915\u0940 \u092e\u0947\u0930\u0947 \u0938\u093e\u0925 \u091c\u0942\u0921\u094b \u0914\u0930 \u092e\u0948\u0902 \u0906\u092a\u0915\u094b \u092e\u0926\u0926 \u0915\u0930\u0942\u0902\u0917\u093e \u092b\u0941\u0932 \u0938\u092a\u094b\u0930\u094d\u091f \u0914\u0930 \u0906\u092a \u0932\u094b\u0917 \u092d\u0940 \u092e\u0941\u091d\u0915\u094b \u092b\u0941\u0932 \u0938\u092a\u094b\u0930\u094d\u091f \u0915\u0940\u091c\u093f\u090f \u0917\u093e\u0907\u0921 \u092e",
+          "\u0422\u0423\u0422: \u043c\u043d\u043e\u0433\u043e \u0432\u0441\u0435\u0433\u043e \u0438\u043d\u0442\u0435\u0440\u0435\u0441\u043d\u043e\u0433\u043e \u0434\u043b\u044f \u0432\u0430\u0441 \u2b07\ufe0f",
+          "Selam ben G\u00fcrol :D",
+          "\ud754\ub4e4\uc5b4\ub304 \ucf5c\ub77c\ub9c8\ub0e5 \ud3ec\ud150\ud130\uc9c0\ub294 \ubc29\uc1a1!   \uba38\ub3c5\ubc29\uc1a1 \uc720\ud29c\ube0c \ucc44\ub110\uc785\ub2c8\ub2e4  \ub2e4\uc18c \ub192\uc740\uc218\uc704\uc758 \ub4dc\ub9bd\uacfc \uc695\uc124\uc744 \uc0ac\uc6a9\ud558\ub2c8 \uc5b4\ub9b0\uc774\ub4e4\uc740 \uc808\ub300 \ub530\ub77c\ud558\uc9c0\ub9c8\uc138\uc694 ",
+          "oioii amores \ud83d\udc9e  aqui fa\u00e7o v\u00eddeos de Avatar World e as vezes alguns outros joguinhos \ud83e\udd0d  Espero que gostem do canal \ud83c\udf6f\ud83d\udc9e  minhas redes sociais: insta: @mellgamesz tiktok: @mellgamesz meu segundo canal: https://youtube.com/@mellgamesz2?si=mIxn_t8p26qI6gHL  roblox: Mellgameszz  \ud83d\udc8c: melissaworld20@gmail.com "
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      }
+    }
+  }
+}

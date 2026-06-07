@@ -1,0 +1,87 @@
+# STRICT Pulsar Validation Rules for YouTube Top 4K Channels
+# These rules are intentionally strict to catch data quality issues
+
+rules:
+  # Global Rank must be exactly unique (no duplicates)
+  - name: "rank_unique_strict"
+    column: "Global Rank"
+    type: "unique"
+    threshold: 1.0
+
+  # Every channel must have > 0 subscribers (no zero/null)
+  - name: "subscribers_gt_zero"
+    column: "Subscribers"
+    type: "range"
+    min: 1
+    max: 200000000
+    threshold: 1.0
+
+  # Every channel must have > 0 videos (no zero/null)
+  - name: "videos_gt_zero"
+    column: "Total Videos"
+    type: "range"
+    min: 1
+    max: 500000
+    threshold: 1.0
+
+  # Every channel must have > 0 views (no zero/null)
+  - name: "views_gt_zero"
+    column: "Total Views"
+    type: "range"
+    min: 1
+    max: 350000000000
+    threshold: 1.0
+
+  # Channel ID must be non-null (strict)
+  - name: "channel_id_required"
+    column: "Channel ID"
+    type: "not_null"
+    threshold: 1.0
+
+  # Channel Name must be non-null (strict)
+  - name: "channel_name_required"
+    column: "Channel Name"
+    type: "not_null"
+    threshold: 1.0
+
+  # Country must be non-null (strict)
+  - name: "country_required"
+    column: "Country"
+    type: "not_null"
+    threshold: 1.0
+
+  # Description must be at least 95% filled (strict)
+  - name: "description_95_percent"
+    column: "Description"
+    type: "not_null"
+    threshold: 0.95
+
+  # Subscribers should be reasonable (< 100M for top creators)
+  - name: "subscribers_reasonable"
+    column: "Subscribers"
+    type: "range"
+    min: 1
+    max: 100000000
+    threshold: 0.95
+
+  # Videos should be reasonable (< 50K)
+  - name: "videos_reasonable"
+    column: "Total Videos"
+    type: "range"
+    min: 1
+    max: 50000
+    threshold: 0.95
+
+  # Channel ID format validation (should be 24 chars)
+  - name: "channel_id_format"
+    column: "Channel ID"
+    type: "regex"
+    pattern: '^UC[a-zA-Z0-9_-]{22}$'
+    threshold: 1.0
+
+  # Country code should be 2 chars
+  - name: "country_format"
+    column: "Country"
+    type: "regex"
+    pattern: '^[A-Z]{2}$'
+    threshold: 0.98

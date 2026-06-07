@@ -1,0 +1,186 @@
+# pulsar/config/drift_detection.yaml
+#
+# Drift Detection Configuration
+#
+# This file configures all drift detectors and their behavior.
+# Each detector can be enabled/disabled and has customizable thresholds.
+
+# =============================================================================
+# DETECTOR CONFIGURATION
+# =============================================================================
+
+detectors:
+  # ---------------------------------------------------------------------------
+  # Completeness Detector
+  # Tracks changes in null/missing values
+  # ---------------------------------------------------------------------------
+  completeness:
+    enabled: true
+    threshold: 0.01          # Trigger if completeness changes by 1%
+    weight: 2.0              # High importance (more nulls = bad)
+    severity_levels:
+      critical: 0.5          # ≥50% change is critical
+      high: 0.2              # ≥20% change is high
+      moderate: 0.1          # ≥10% change is moderate
+      low: 0.05              # ≥5% change is low
+  
+  # ---------------------------------------------------------------------------
+  # Mean Shift Detector
+  # Tracks changes in numeric column averages
+  # ---------------------------------------------------------------------------
+  mean_shift:
+    enabled: true
+    threshold: 0.05          # Trigger if mean changes by 5%
+    weight: 1.0              # Standard importance
+    severity_levels:
+      critical: 0.5          # ≥50% change
+      high: 0.2              # ≥20% change
+      moderate: 0.1          # ≥10% change
+      low: 0.05              # ≥5% change
+  
+  # ---------------------------------------------------------------------------
+  # Standard Deviation Detector
+  # Tracks changes in data spread/volatility
+  # ---------------------------------------------------------------------------
+  std_deviation:
+    enabled: true
+    threshold: 0.20          # Trigger if std changes by 20%
+    weight: 0.7              # Lower importance than mean
+    severity_levels:
+      critical: 0.8          # ≥80% change
+      high: 0.4              # ≥40% change
+      moderate: 0.2          # ≥20% change
+      low: 0.1               # ≥10% change
+  
+  # ---------------------------------------------------------------------------
+  # Outlier Drift Detector
+  # Tracks changes in outlier counts (IQR method)
+  # ---------------------------------------------------------------------------
+  outlier_drift:
+    enabled: true
+    threshold: 0.20          # Trigger if outlier count changes by 20%
+    weight: 0.8              # Important for data quality
+    severity_levels:
+      critical: 1.0          # ≥100% change (doubled outliers)
+      high: 0.5              # ≥50% change
+      moderate: 0.2          # ≥20% change
+      low: 0.1               # ≥10% change
+  
+  # ---------------------------------------------------------------------------
+  # Format Validation Detector
+  # Tracks changes in string format matches (email, phone, URL, etc.)
+  # ---------------------------------------------------------------------------
+  format_validation:
+    enabled: true
+    threshold: 5.0           # Trigger if format match changes by 5 percentage points
+    weight: 1.0              # Standard importance
+    formats:                 # Which formats to track
+      - email
+      - phone_us
+      - phone_intl
+      - url
+      - ipv4
+      - uuid
+      - date_iso
+      - credit_card
+    severity_levels:
+      critical: 20.0         # ≥20 percentage points
+      high: 10.0             # ≥10 percentage points
+      moderate: 5.0          # ≥5 percentage points
+      low: 2.0               # ≥2 percentage points
+  
+  # ---------------------------------------------------------------------------
+  # Uniqueness Detector
+  # Tracks changes in duplicate counts
+  # ---------------------------------------------------------------------------
+  uniqueness:
+    enabled: true
+    threshold: 0.05          # Trigger if uniqueness changes by 5%
+    weight: 0.8              # Important for data integrity
+    severity_levels:
+      critical: 0.5          # ≥50% change
+      high: 0.2              # ≥20% change
+      moderate: 0.1          # ≥10% change
+      low: 0.05              # ≥5% change
+  
+  # ---------------------------------------------------------------------------
+  # Cardinality Detector
+  # Tracks changes in distinct value counts (categorical diversity)
+  # ---------------------------------------------------------------------------
+  cardinality:
+    enabled: true
+    threshold: 0.10          # Trigger if cardinality ratio changes by 10%
+    weight: 0.5              # Lower importance
+    severity_levels:
+      critical: 0.5          # ≥50% change
+      high: 0.3              # ≥30% change
+      moderate: 0.1          # ≥10% change
+      low: 0.05              # ≥5% change
+  
+  # ---------------------------------------------------------------------------
+  # Distribution Shape Detector (Skewness)
+  # Tracks changes in distribution symmetry
+  # ---------------------------------------------------------------------------
+  skewness:
+    enabled: true
+    threshold: 0.5           # Trigger if skewness changes by 0.5
+    weight: 0.3              # Low importance (informational)
+    severity_levels:
+      critical: 2.0          # Skewness change ≥2.0
+      high: 1.0              # Skewness change ≥1.0
+      moderate: 0.5          # Skewness change ≥0.5
+      low: 0.2               # Skewness change ≥0.2
+  
+  # ---------------------------------------------------------------------------
+  # Row Count Detector (Dataset Level)
+  # Tracks changes in total row count
+  # ---------------------------------------------------------------------------
+  row_count:
+    enabled: true
+    threshold: 0.05          # Trigger if row count changes by 5%
+    weight: 1.5              # High importance
+    severity_levels:
+      critical: 0.5          # ≥50% change
+      high: 0.2              # ≥20% change
+      moderate: 0.1          # ≥10% change
+      low: 0.05              # ≥5% change
+
+# =============================================================================
+# GLOBAL SETTINGS
+# =============================================================================
+
+# Performance settings
+parallel_processing: true    # Enable parallel detector execution
+max_workers: 4               # Number of parallel workers
+
+# Caching
+cache_enabled: true          # Cache detector results
+cache_ttl_seconds: 3600      # Cache time-to-live (1 hour)
+
+# Output settings
+max_insights: 10             # Maximum actionable insights to show
+insight_min_severity: "LOW"  # Minimum severity for insights (NONE, LOW, MODERATE, HIGH, CRITICAL)
+
+# Reporting
+generate_html_report: false  # Generate HTML drift report
+save_detailed_json: true     # Save detailed JSON with all metrics
+
+# Logging
+log_level: "INFO"            # DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_drift_details: true      # Log detailed drift metrics
+
+# =============================================================================
+# CUSTOM DETECTOR EXAMPLES (User-Defined)
+# =============================================================================
+
+# Example: Custom business logic detector
+# custom_detectors:
+#   price_range:
+#     enabled: true
+#     class: "mycompany.detectors.PriceRangeDetector"
+#     threshold: 0.10
+#     weight: 1.0
+#     config:
+#       min_price: 0
+#       max_price: 1000
+#       currency: "USD"

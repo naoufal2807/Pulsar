@@ -1,0 +1,303 @@
+{
+  "metadata": {
+    "dataset_name": "global_top4k",
+    "file_path": "global_top4k.csv",
+    "baseline_timestamp": "2026-05-10T16:57:39.884446",
+    "baseline_date": "2026-05-10",
+    "baseline_time": "16:57:39",
+    "pulsar_version": "0.2.0",
+    "session_id": "6724176e"
+  },
+  "dataset_profile": {
+    "dataset_name": "global_top4k.csv",
+    "path": "global_top4k.csv",
+    "row_count": 3964,
+    "column_count": 8,
+    "columns": {
+      "Global Rank": {
+        "position": 0,
+        "dtype": "Int64",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 3964,
+        "uniqueness": 1.0,
+        "cardinality_ratio": 1.0,
+        "sample_values": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "numeric_stats": {
+          "min": 1.0,
+          "max": 3964.0,
+          "mean": 1982.5,
+          "std": 1144.4525619992585,
+          "p25": 992.0,
+          "p50": 1983.0,
+          "p75": 2973.0,
+          "p90": 3568.0,
+          "p99": 3924.0,
+          "skewness": 0.0,
+          "kurtosis": -1.2000001527369029,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 0,
+              "outlier_percentage": 0.0,
+              "lower_bound": -1981.0,
+              "upper_bound": 5947.0
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 0,
+              "outlier_percentage": 0.0
+            }
+          },
+          "iqr_stats": {
+            "q1": 992.0,
+            "q3": 2974.0,
+            "iqr": 1982
+          }
+        }
+      },
+      "Channel ID": {
+        "position": 1,
+        "dtype": "String",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 3964,
+        "uniqueness": 1.0,
+        "cardinality_ratio": 1.0,
+        "sample_values": [
+          "UCKUwIEjEWOK8MnQ23q8MMNQ",
+          "UCEAyMP9dKbWmymYxqKofxyQ",
+          "UC1xcZ8Z6Qy1WLPUNwEPnLXA",
+          "UCWlx7GTk0zQCi_0tKJhV72w",
+          "UCrTTE-QVXsb8QYwcyj3IMkQ"
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      },
+      "Channel Name": {
+        "position": 2,
+        "dtype": "String",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 3954,
+        "uniqueness": 0.9975,
+        "cardinality_ratio": 0.9975,
+        "sample_values": [
+          "\u5c0f\u67f3\u30ed\u30a6 / Koyanagi Rou\u3010\u306b\u3058\u3055\u3093\u3058\u3011",
+          "LazySly",
+          "ai video prompt ",
+          "Fluger New",
+          "HandOfUncut"
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      },
+      "Subscribers": {
+        "position": 3,
+        "dtype": "Int64",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 2131,
+        "uniqueness": 0.5376,
+        "cardinality_ratio": 0.5376,
+        "sample_values": [
+          "0",
+          "1",
+          "2",
+          "4",
+          "5"
+        ],
+        "numeric_stats": {
+          "min": 0.0,
+          "max": 474000000.0,
+          "mean": 2258728.456357215,
+          "std": 11924323.23755483,
+          "p25": 65100.0,
+          "p50": 343000.0,
+          "p75": 1330000.0,
+          "p90": 4240000.0,
+          "p99": 27000000.0,
+          "skewness": 23.389706015434413,
+          "kurtosis": 764.9768406127556,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 504,
+              "outlier_percentage": 12.71,
+              "lower_bound": -1832250.0,
+              "upper_bound": 3227350.0
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 30,
+              "outlier_percentage": 0.76
+            }
+          },
+          "iqr_stats": {
+            "q1": 65100.0,
+            "q3": 1330000.0,
+            "iqr": 1264900
+          }
+        }
+      },
+      "Total Views": {
+        "position": 4,
+        "dtype": "Int64",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 3963,
+        "uniqueness": 0.9997,
+        "cardinality_ratio": 0.9997,
+        "sample_values": [
+          "0",
+          "11",
+          "37",
+          "5652",
+          "10975"
+        ],
+        "numeric_stats": {
+          "min": 0.0,
+          "max": 335650634349.0,
+          "mean": 1220082708.0908175,
+          "std": 7981917702.844633,
+          "p25": 25936051.0,
+          "p50": 135328207.0,
+          "p75": 588746626.0,
+          "p90": 2060744004.0,
+          "p99": 16349386612.0,
+          "skewness": 25.782707198817803,
+          "kurtosis": 899.9455128995183,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 526,
+              "outlier_percentage": 13.27,
+              "lower_bound": -819162558.5,
+              "upper_bound": 1434433733.5
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 28,
+              "outlier_percentage": 0.71
+            }
+          },
+          "iqr_stats": {
+            "q1": 25936051.0,
+            "q3": 589335124.0,
+            "iqr": 563399073
+          }
+        }
+      },
+      "Total Videos": {
+        "position": 5,
+        "dtype": "Int64",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 2082,
+        "uniqueness": 0.5252,
+        "cardinality_ratio": 0.5252,
+        "sample_values": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "numeric_stats": {
+          "min": 0.0,
+          "max": 541883.0,
+          "mean": 2121.6215943491425,
+          "std": 14379.953625169366,
+          "p25": 140.0,
+          "p50": 611.0,
+          "p75": 1843.0,
+          "p90": 3724.0,
+          "p99": 13283.0,
+          "skewness": 26.001977898208658,
+          "kurtosis": 789.848318261995,
+          "outliers": {
+            "iqr_method": {
+              "method": "IQR",
+              "outlier_count": 289,
+              "outlier_percentage": 7.29,
+              "lower_bound": -2417.5,
+              "upper_bound": 4402.5
+            },
+            "zscore_method": {
+              "method": "Z-score",
+              "threshold": 3.0,
+              "outlier_count": 15,
+              "outlier_percentage": 0.38
+            }
+          },
+          "iqr_stats": {
+            "q1": 140.0,
+            "q3": 1845.0,
+            "iqr": 1705
+          }
+        }
+      },
+      "Country": {
+        "position": 6,
+        "dtype": "String",
+        "non_null_count": 3964,
+        "null_count": 0,
+        "completeness": 1.0,
+        "distinct_count": 83,
+        "uniqueness": 0.0209,
+        "cardinality_ratio": 0.0209,
+        "sample_values": [
+          "AU",
+          "MY",
+          "LT",
+          "SE",
+          "KZ"
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      },
+      "Description": {
+        "position": 7,
+        "dtype": "String",
+        "non_null_count": 3457,
+        "null_count": 507,
+        "completeness": 0.8721,
+        "distinct_count": 3426,
+        "uniqueness": 0.991,
+        "cardinality_ratio": 0.8643,
+        "sample_values": [
+          "estranho e criativo.",
+          "\ud83c\udf34 \u00a1Bienvenidos a TropikAll! \ud83c\udf3a Donde la buena m\u00fasica nunca termina y los ritmos tropicales te hacen bailar sin parar. Desde los dulces acordes de la bachata hasta los vibrantes pasos de salsa, aqu\u00ed encontrar\u00e1s lo mejor de la m\u00fasica latina para disfrutar al m\u00e1ximo. \u00a1Prep\u00e1rate para mover las caderas y dejarte llevar por el ritmo! \ud83d\udc83\ud83c\udfb6",
+          "\u250c\u2500\u2500\u2500\u2500\u2500  \ud83c\udf45SPENDEN\ud83c\udf45  \u2500\u2500\u2500\u2500\u2500\u2500\u2510  \ud83d\udcb6 Spenden:  https://streamelements.com/carston/tip \u2705 Creator Code: carstonYT \ud83c\udf96\ufe0fVIP:   \u251c\u2500\u2500\u2500\u2500 \ud83c\udf45TOP SPENDEN\ud83c\udf45 \u2500\u2500\u2500\u2500\u2524  1. Luzus \u20ac591.70 \ud83e\udd47\ud83d\udc9b 2. GxdionSenpai \u20ac120.00 \ud83e\udd48  3. ChanelON \u20ac92.02 \u20ac \ud83e\udd49 4. LeneS_5 \u20ac82.00 5. Carstonsfrau \u20ac72.99  \u251c\u2500\u2500\u2500\u2500\u2500\u2500 \ud83c\udf45KAN\u00c4LE\ud83c\udf45 \u2500\u2500\u2500\u2500\u2500\u2500\u2524  MAIN KANAL: \u26aa\ufe0f \u2068 https://www.youtube.com/@carston173    LIVE KANAL: \ud83d\udd34 https://www.youtube.com/@carston SHORTS KANAL: \ud83d\udfe1 \u2068 ",
+          "\u0627\u0633\u0645\u064a \u0639\u0628\u0627\u062f\u064a \u0627\u0646\u0632\u0644 \u0645\u062a\u062e\u0635\u0635 \u0641\u064a \u0645\u062d\u062a\u0648\u0649 \u0645\u0627\u064a\u0646 \u0643\u0631\u0627\u0641\u062a \u0627\u0644\u0645\u062a\u0646\u0648\u0639  \u0627\u0634\u062a\u0631\u0643 \u0639\u0634\u0627\u0646 \u0646\u0648\u0635\u0644 2 \u0645\u0644\u064a\u0648\u0646 \u0645\u0634\u062a\u0631\u0643 !!  ",
+          "\ud83d\ude0e CANAL OFICIAL! Tudo o que voc\u00ea precisa saber sobre o competitivo de Free Fire.\ud83d\udd25 "
+        ],
+        "categorical_stats": {
+          "top_k": [],
+          "error": "'values'"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,71 @@
+# Pulsar Validation Rules for YouTube Top 4K Channels Dataset
+# Rules to ensure data quality for channel analytics
+
+rules:
+  # Global Rank should be unique (1-3964)
+  - name: "rank_unique"
+    column: "Global Rank"
+    type: "unique"
+    threshold: 1.0
+
+  # Global Rank should be sequential 1-3964
+  - name: "rank_in_range"
+    column: "Global Rank"
+    type: "range"
+    min: 1
+    max: 4000
+    threshold: 1.0
+
+  # Channel ID should be unique (every channel is different)
+  - name: "channel_id_unique"
+    column: "Channel ID"
+    type: "unique"
+    threshold: 1.0
+
+  # Channel ID should not be null
+  - name: "channel_id_not_null"
+    column: "Channel ID"
+    type: "not_null"
+    threshold: 1.0
+
+  # Channel Name should not be null
+  - name: "channel_name_not_null"
+    column: "Channel Name"
+    type: "not_null"
+    threshold: 0.95
+
+  # Subscribers should be non-negative
+  - name: "subscribers_non_negative"
+    column: "Subscribers"
+    type: "range"
+    min: 0
+    max: 500000000
+    threshold: 1.0
+
+  # Total Views should be non-negative
+  - name: "total_views_non_negative"
+    column: "Total Views"
+    type: "range"
+    min: 0
+    max: 400000000000
+    threshold: 1.0
+
+  # Total Videos should be non-negative
+  - name: "total_videos_non_negative"
+    column: "Total Videos"
+    type: "range"
+    min: 0
+    max: 600000
+    threshold: 1.0
+
+  # Country should be valid country code
+  - name: "country_valid"
+    column: "Country"
+    type: "not_null"
+    threshold: 1.0
+
+  # Description can be null but should be mostly filled
+  - name: "description_mostly_filled"
+    column: "Description"
+    type: "not_null"
+    threshold: 0.80

@@ -4,7 +4,7 @@ import typer
 from pathlib import Path
 import json
 from typing import Optional, Dict, Any
-
+import uuid
 import polars as pl
 
 from pulsar.logging_config import setup_logging, get_logger
@@ -178,6 +178,105 @@ def validate(
         typer.echo(f"❌ Error: {e}", err=True)
         raise typer.Exit(code=1)
 
-
+# Baeline command for drift detection (03-05-2026)
+@app.command()
+def baseline(
+    file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
+    save: bool = typer.Option(False, "--save", help="Create baseline snapshot"),
+    compare: Optional[str] = typer.Option(None, "--compare", help="Compare to baseline file"),
+    output: Optional[str] = typer.Option(None, "--output", help="Output path for baseline/drift JSON"),
+    log_file: Optional[str] = typer.Option(None, help="Log file path"),
+):
+    """Create baseline or detect drift."""
+    log_path = setup_logging(log_file or "logs")
+    session_id = str(uuid.uuid4())[:8]
+    
+    logger.info(f"Baseline command: file={file}, save={save}, compare={compare}")
+    
+    try:
+        from pulsar.core.quality.baseline import BaselineManager
+        
+        lf = load(file)
+        dataset_name = Path(file).stem
+        logger.info(f"File loaded: {file}")
+        
+        manager = BaselineManager()
+        
+        if save:
+            # CREATE BASELINE
+            baseline_path = manager.create_baseline(
+                lf=lf,
+                dataset_name=dataset_name,
+                file_path=file,
+                session_id=session_id,
+                output_path=output,
+            )
+            print(f"\n✅ Baseline created: {baseline_path}")
+            print(f"   Session: {session_id}\n")
+        
+        elif compare:
+            # COMPARE TO BASELINE
+            drift_report = manager.compare_to_baseline(
+                lf=lf,
+                dataset_name=dataset_name,
+                file_path=file,
+                baseline_path=compare,
+                session_id=session_id,
+                output_path=output,
+            )
+            
+            # Display summary
+            summary = drift_report["summary"]
+            print(f"\n{'='*80}")
+            print(f"DRIFT DETECTION REPORT")
+            print(f"{'='*80}")
+            print(f"Dataset: {dataset_name}")
+            print(f"Baseline: {compare}")
+            print(f"Drift Score: {summary['overall_drift_score']:.3f} ({summary['severity']})")
+            print(f"Columns with Drift: {summary['columns_with_drift']}/{summary['total_columns']} ({summary['drift_percentage']:.1f}%)")
+            
+            if summary['new_columns']:
+                print(f"New Columns: {', '.join(summary['new_columns'])}")
+            if summary['deleted_columns']:
+                print(f"Deleted Columns: {', '.join(summary['deleted_columns'])}")
+            if summary['type_changes']:
+                print(f"Type Changes: {len(summary['type_changes'])} column(s)")
+            
+            print(f"{'='*80}")
+            
+            # Show high drift columns
+            high_drift_cols = [
+                (name, data) for name, data in drift_report["column_drift"].items()
+                if data["drift_detected"] and data.get("severity") in ["HIGH", "CRITICAL"]
+            ]
+            
+            if high_drift_cols:
+                print(f"\n🚨 HIGH/CRITICAL DRIFT COLUMNS:")
+                for col_name, col_data in high_drift_cols:
+                    print(f"\n  {col_name} ({col_data['severity']}) - Score: {col_data['drift_score']:.3f}")
+                    for alert in col_data.get("alerts", []):
+                        print(f"    • {alert}")
+            
+            print(f"\n📄 Full report: {drift_report['metadata']['comparison_timestamp'].split('T')[0]}")
+            print(f"   Saved to drift_reports/")
+            print(f"   Session: {session_id}\n")
+        
+        else:
+            print("❌ Error: Must specify --save or --compare")
+            logger.error("No action specified (--save or --compare required)")
+            raise typer.Exit(code=1)
+    
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        logger.error(f"Baseline error: {e}")
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1)
 if __name__ == "__main__":
     app()
