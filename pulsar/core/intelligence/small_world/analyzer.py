@@ -93,8 +93,8 @@ class Analyzer:
         # Generate recommendations
         recommendations = self._generate_recommendations(patterns, expansion_result, weaknesses)
 
-        # Generate summary statement
-        summary = self._generate_summary(data_type, purpose, quality_grade, coverage_ratio)
+        # Generate summary statement with context
+        summary = self._generate_summary(data_type, purpose, quality_grade, coverage_ratio, patterns)
 
         return Understanding(
             summary=summary,
@@ -403,15 +403,53 @@ class Analyzer:
         purpose: str,
         quality_grade: str,
         coverage_ratio: float,
+        patterns: Dict[str, Any] = None,
     ) -> str:
-        """Generate human-readable summary statement."""
+        """Generate human-readable contextualized summary statement."""
         coverage_pct = round(coverage_ratio * 100, 1)
 
-        # Build summary
-        summary = f"This is {data_type} data used for {purpose}. "
-        summary += f"Quality: {quality_grade} ({coverage_pct}% valid rows)."
+        # Build summary with context
+        if patterns:
+            ranges = patterns.get('ranges', {})
+            numeric_cols = [col for col, info in ranges.items() if info.get('type') == 'numeric']
+            categorical_cols = [col for col, info in ranges.items() if info.get('type') == 'categorical']
+            col_count = len(ranges)
+
+            # Infer data nature from columns
+            if any(term in str(ranges.keys()).lower() for term in ['medal', 'gold', 'silver', 'bronze']):
+                context = "sports competition data"
+            elif any(term in str(ranges.keys()).lower() for term in ['customer', 'user', 'account']):
+                context = "customer/user data"
+            elif any(term in str(ranges.keys()).lower() for term in ['sales', 'revenue', 'amount']):
+                context = "financial/sales data"
+            elif any(term in str(ranges.keys()).lower() for term in ['date', 'time', 'timestamp']):
+                context = "temporal/time-series data"
+            elif any(term in str(ranges.keys()).lower() for term in ['country', 'region', 'location']):
+                context = "geographic data"
+            else:
+                context = f"{data_type if data_type != 'unknown' else 'transactional'} data"
+
+            summary = f"This dataset contains {context}. "
+            summary += f"Structure: {col_count} columns ({len(numeric_cols)} numeric, {len(categorical_cols)} categorical). "
+            summary += f"Quality Grade: {quality_grade} ({coverage_pct}% coverage). "
+            summary += "Assessment: " + self._quality_assessment(quality_grade)
+        else:
+            summary = f"This is {data_type} data used for {purpose}. "
+            summary += f"Quality: {quality_grade} ({coverage_pct}% valid rows). "
+            summary += self._quality_assessment(quality_grade)
 
         return summary
+
+    def _quality_assessment(self, quality_grade: str) -> str:
+        """Generate quality assessment text."""
+        assessments = {
+            'A': "Data is in excellent condition with high completeness and minimal issues.",
+            'B': "Data is in good condition with minor issues that should be addressed.",
+            'C': "Data quality is acceptable but has notable issues requiring remediation.",
+            'D': "Data quality is poor with significant issues requiring immediate attention.",
+            'F': "Data quality is critical with severe issues that must be resolved."
+        }
+        return assessments.get(quality_grade, "Data quality assessment pending.")
 
     def compare(
         self,
