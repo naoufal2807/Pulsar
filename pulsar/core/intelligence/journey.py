@@ -86,15 +86,21 @@ class DataExplorationJourney:
             "What does the data represent?",
         ]
 
+        # Get sample data to provide concrete context
+        sample = self.df.head(5)
+        first_row = dict(sample[0])
+
         prompt = (
-            f"You are starting a guided journey to become an 'ace' at understanding "
-            f"the dataset '{self.dataset_name}'. "
-            f"First, let's scout the basics:\n\n"
-            f"Dataset: {self.dataset_name}\n"
-            f"Size: {self.df.height:,} rows × {self.df.width} columns\n"
+            f"SCOUT STAGE: Provide a CONCRETE, SPECIFIC overview of '{self.dataset_name}'.\n\n"
+            f"Dataset Size: {self.df.height:,} rows × {self.df.width} columns\n"
             f"Columns: {', '.join(self.df.columns)}\n\n"
-            f"Start by giving a high-level overview of what this dataset is about. "
-            f"Then describe each column briefly. Be welcoming and set up the journey!"
+            f"Sample row: {first_row}\n\n"
+            f"Your task:\n"
+            f"1. What IS this dataset? (Not generic - be SPECIFIC)\n"
+            f"2. What DOMAIN is it? (Entertainment? Sports? Finance?)\n"
+            f"3. What are the 3 most important columns and WHY?\n"
+            f"4. What business questions could be answered?\n\n"
+            f"Do NOT say 'I'm ready to analyze'. Give SPECIFIC insights about this data RIGHT NOW."
         )
 
         overview = self.agent.think(prompt)
@@ -110,7 +116,7 @@ class DataExplorationJourney:
             description=overview,
             questions_explored=questions,
             insights_gained=insights,
-            next_stage_hint="Now let's EXPLORE the patterns and distributions in the data.",
+            next_stage_hint="Next: EXPLORE the patterns and distributions in the data.",
         )
 
     def explore_stage(self) -> str:
@@ -123,35 +129,35 @@ class DataExplorationJourney:
             "Are there obvious patterns or groupings?",
         ]
 
-        # Use tools to get real insights
-        tool_prompts = []
-
-        # Numeric columns analysis
+        # Identify key columns to analyze
         numeric_cols = [
             col for col in self.df.columns
             if self.df[col].dtype in [pl.Int32, pl.Int64, pl.Float32, pl.Float64]
         ]
 
-        if numeric_cols:
-            for col in numeric_cols[:3]:  # Top 3 numeric columns
-                tool_prompts.append(f"- Statistics for {col}")
-
-        # Categorical columns analysis
         categorical_cols = [
             col for col in self.df.columns
             if self.df[col].dtype == pl.Utf8
         ]
 
+        # Build specific analysis requests
+        analyses = []
+        if numeric_cols:
+            analyses.extend([f"[TOOL: compute_statistics(column={col})]" for col in numeric_cols[:2]])
         if categorical_cols:
-            for col in categorical_cols[:3]:  # Top 3 categorical columns
-                tool_prompts.append(f"- Top values in {col}")
+            analyses.extend([f"[TOOL: get_top_values(column={col}, limit=5)]" for col in categorical_cols[:3]])
 
         prompt = (
-            f"Now let's EXPLORE the dataset '{self.dataset_name}'.\n\n"
-            f"Analyze these aspects:\n" + "\n".join(tool_prompts) + "\n\n"
-            f"Help the user discover the main patterns, distributions, and interesting features. "
-            f"What columns are most important? What stands out? "
-            f"Make this an exciting discovery process!"
+            f"EXPLORER STAGE: Deep pattern discovery in '{self.dataset_name}'.\n\n"
+            f"EXECUTE these tools and report SPECIFIC numbers:\n"
+            + "\n".join(analyses) + f"\n\n"
+            f"Then provide CONCRETE findings:\n"
+            f"1. Key statistics (means, ranges, distributions)\n"
+            f"2. Top categories and their counts\n"
+            f"3. What patterns JUMP OUT from the data?\n"
+            f"4. Which columns are MOST IMPORTANT for analysis?\n\n"
+            f"Be SPECIFIC with numbers, percentages, rankings. "
+            f"Avoid vague statements. This is DISCOVERY - find interesting facts!"
         )
 
         exploration = self.agent.think(prompt, max_iterations=5)
@@ -170,7 +176,7 @@ class DataExplorationJourney:
             description=exploration,
             questions_explored=questions,
             insights_gained=insights,
-            next_stage_hint="Let's DETECT anomalies and deep patterns in the data.",
+            next_stage_hint="Next: DETECT anomalies and deep patterns in the data.",
         )
 
         self.checkpoints.append(checkpoint)
@@ -186,15 +192,34 @@ class DataExplorationJourney:
             "Are there unexpected relationships?",
         ]
 
+        # Get columns to check for quality
+        numeric_cols = [
+            col for col in self.df.columns
+            if self.df[col].dtype in [pl.Int32, pl.Int64, pl.Float32, pl.Float64]
+        ]
+
+        categorical_cols = [
+            col for col in self.df.columns
+            if self.df[col].dtype == pl.Utf8
+        ][:3]
+
+        quality_checks = []
+        quality_checks.extend([f"[TOOL: check_data_quality(column={col})]" for col in categorical_cols])
+        if numeric_cols:
+            quality_checks.extend([f"[TOOL: detect_outliers(column={col})]" for col in numeric_cols[:2]])
+
         prompt = (
-            f"Now let's turn detective on '{self.dataset_name}'.\n\n"
-            f"Look for:\n"
-            f"- Outliers and anomalies\n"
-            f"- Data quality issues\n"
-            f"- Suspicious patterns\n"
-            f"- Relationships between variables\n\n"
-            f"Be thorough. What might someone miss? "
-            f"What should they investigate further?"
+            f"DETECTIVE STAGE: Find REAL problems in '{self.dataset_name}'.\n\n"
+            f"EXECUTE quality checks:\n"
+            + "\n".join(quality_checks) + f"\n\n"
+            f"Report SPECIFIC issues found:\n"
+            f"1. NULL values - which columns and how many?\n"
+            f"2. Duplicates - any exact duplicates?\n"
+            f"3. Outliers - what's unusual or extreme?\n"
+            f"4. Data type mismatches - any suspicious values?\n"
+            f"5. Missing domains - any incomplete data?\n\n"
+            f"This is DETECTIVE work: Find the red flags that need investigation. "
+            f"Give SPECIFIC column names and percentages."
         )
 
         investigation = self.agent.think(prompt, max_iterations=5)
@@ -213,7 +238,7 @@ class DataExplorationJourney:
             description=investigation,
             questions_explored=questions,
             insights_gained=insights,
-            next_stage_hint="Now let's ANALYZE correlations and advanced insights.",
+            next_stage_hint="Next: ANALYZE correlations and advanced insights.",
         )
 
         self.checkpoints.append(checkpoint)
@@ -229,14 +254,28 @@ class DataExplorationJourney:
             "What drives the most important metrics?",
         ]
 
+        numeric_cols = [
+            col for col in self.df.columns
+            if self.df[col].dtype in [pl.Int32, pl.Int64, pl.Float32, pl.Float64]
+        ]
+
+        correlations = []
+        if len(numeric_cols) >= 2:
+            for i in range(min(3, len(numeric_cols)-1)):
+                correlations.append(f"[TOOL: analyze_correlation(col1={numeric_cols[i]}, col2={numeric_cols[i+1]})]")
+
         prompt = (
-            f"Now we're becoming an ANALYST of '{self.dataset_name}'.\n\n"
-            f"Analyze:\n"
-            f"- Correlations between variables\n"
-            f"- What drives key metrics\n"
-            f"- Business implications\n"
-            f"- Risk factors\n\n"
-            f"Think strategically. What insights create competitive advantage?"
+            f"ANALYST STAGE: Strategic insights from '{self.dataset_name}'.\n\n"
+            f"EXECUTE correlation analysis:\n"
+            + "\n".join(correlations) + f"\n\n"
+            f"Provide STRATEGIC insights:\n"
+            f"1. Key relationships - what variables drive each other?\n"
+            f"2. Correlation findings - are there strong relationships? Which ones?\n"
+            f"3. Business drivers - what factors matter most?\n"
+            f"4. Opportunities - what insights create competitive advantage?\n"
+            f"5. Risks - what should be monitored?\n"
+            f"6. Recommendations - what should be optimized?\n\n"
+            f"Think like a strategist. What patterns would matter to executives?"
         )
 
         analysis = self.agent.think(prompt, max_iterations=5)
@@ -255,7 +294,7 @@ class DataExplorationJourney:
             description=analysis,
             questions_explored=questions,
             insights_gained=insights,
-            next_stage_hint="Finally, let's reach ACE mastery with expert recommendations.",
+            next_stage_hint="Finally: Reach ACE mastery with expert recommendations.",
         )
 
         self.checkpoints.append(checkpoint)
@@ -272,13 +311,25 @@ class DataExplorationJourney:
         ]
 
         prompt = (
-            f"You've reached ACE level mastery of '{self.dataset_name}'.\n\n"
-            f"Synthesize everything learned. Provide:\n"
-            f"1. Top 3 critical findings\n"
-            f"2. Specific actionable recommendations\n"
-            f"3. Risks to monitor going forward\n"
-            f"4. Next steps for deeper analysis\n\n"
-            f"This is the expert summary that someone would take to leadership."
+            f"ACE STAGE: You are now an EXPERT on '{self.dataset_name}'.\n\n"
+            f"Synthesize EVERYTHING from SCOUT through ANALYST stages.\n\n"
+            f"Provide an EXECUTIVE SUMMARY with:\n\n"
+            f"1. TOP 3 CRITICAL FINDINGS (not vague - SPECIFIC facts)\n"
+            f"   - Example: '78% of content is from 5 countries'\n"
+            f"   - Example: 'Average release year is 2015, shows aging dataset'\n\n"
+            f"2. ACTIONABLE RECOMMENDATIONS (specific, not generic)\n"
+            f"   - What should be done based on findings?\n"
+            f"   - What metrics should be optimized?\n"
+            f"   - Where is the biggest opportunity?\n\n"
+            f"3. RISKS & MITIGATION (real concerns)\n"
+            f"   - Data quality issues to fix\n"
+            f"   - Business risks from patterns\n"
+            f"   - What needs monitoring\n\n"
+            f"4. NEXT STEPS\n"
+            f"   - Deeper analyses needed\n"
+            f"   - Questions to investigate\n\n"
+            f"This is the EXECUTIVE BRIEF you'd present to leadership. "
+            f"Be SPECIFIC, ACTIONABLE, and INSIGHTFUL."
         )
 
         expert_synthesis = self.agent.think(prompt, max_iterations=3)
@@ -377,7 +428,7 @@ class DataExplorationJourney:
             transition += f"  • {insight}\n"
 
         if checkpoint.next_stage_hint:
-            transition += f"\n→ Next: {checkpoint.next_stage_hint}\n"
+            transition += f"\n[NEXT] {checkpoint.next_stage_hint}\n"
 
         return transition
 
