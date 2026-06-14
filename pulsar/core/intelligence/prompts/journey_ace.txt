@@ -1,0 +1,40 @@
+STAGE 5: ACE - Expert Synthesis
+
+You have complete understanding of this data. Now synthesize all findings into a cohesive executive summary.
+
+Dataset: {dataset_name}
+Domain: {domain}
+
+Your synthesis should provide:
+
+1. EXECUTIVE SUMMARY (2 paragraphs)
+   - What this data represents
+   - Most important findings
+
+2. KEY FINDINGS (5-7 bullets)
+   - Critical patterns discovered
+   - Risks identified
+   - Opportunities uncovered
+   - Surprising insights
+
+3. BUSINESS IMPLICATIONS
+   - What should the organization know?
+   - How should this inform decisions?
+   - What actions should be taken?
+
+4. RECOMMENDATIONS (3-5 specific actions)
+   - Priority actions
+   - Expected impact
+   - Metrics to monitor
+
+5. DATA QUALITY ASSESSMENT
+   - Data readiness for operational use
+   - Caveats and limitations
+   - Areas needing attention
+
+6. NEXT STEPS
+   - Additional analysis needed
+   - Monitoring/tracking requirements
+   - Future data collection improvements
+
+Your response should be suitable for a C-suite executive. Use clear business language, concrete numbers, and actionable recommendations. Avoid technical jargon unless necessary.

@@ -1,0 +1,21 @@
+STAGE 2: EXPLORER - Pattern Discovery
+
+You're now exploring what makes this data interesting and valuable.
+
+Dataset: {dataset_name}
+Domain: {domain}
+
+Your analysis should answer:
+1. Who/what are the key entities? (countries, users, products, etc)
+2. What patterns exist? (correlations, trends, groupings)
+3. Who are the leaders/winners in this data? (top 20%, concentration)
+4. What dominates and what's diverse? (distribution shape)
+5. What relationships exist between key variables?
+
+Use tools to:
+- identify_key_entities: Find main actors/values
+- describe_patterns: Identify data structure
+- find_top_performers: Locate high-value entities
+- analyze_concentration: Measure market power distribution
+
+Format as insights with business implications. Example: "80% of revenue comes from 3 customers (concentration = high monopoly risk). This creates dependency risk but offers upselling opportunity."

@@ -1,0 +1,21 @@
+STAGE 1: SCOUT - Dataset Overview
+
+You are at the beginning of understanding a new dataset. Your goal is to provide a CONCRETE, SPECIFIC overview.
+
+Dataset: {dataset_name}
+Size: {row_count} rows × {column_count} columns
+Columns: {column_names}
+
+Your analysis should answer:
+1. What IS this dataset? (Be specific, not generic)
+2. What domain is it? (Business context, industry)
+3. What time period does it cover?
+4. What are the key dimensions?
+5. What questions could this data help answer?
+
+Use tools to:
+- describe_dataset: Get exact shape and types
+- infer_domain: Determine business context
+- extract_key_metrics: Identify important numbers
+
+Format your response as a clear, structured overview that would help someone new to this data understand it in 2 minutes.

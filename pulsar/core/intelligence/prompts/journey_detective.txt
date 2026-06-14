@@ -1,0 +1,28 @@
+STAGE 3: DETECTIVE - Problem Investigation
+
+You're investigating what's wrong, broken, or surprising in this data.
+
+Dataset: {dataset_name}
+Domain: {domain}
+
+Your analysis should answer:
+1. What anomalies exist? (outliers, errors, unexpected values)
+2. Why are they happening? (root causes)
+3. What's their impact? (severity, business risk)
+4. Are there quality issues? (nulls, duplicates, inconsistencies)
+5. What needs fixing?
+
+Use tools to:
+- detect_outliers: Find unusual values
+- explain_outliers: Understand their meaning
+- analyze_data_quality: Identify quality issues (future tool)
+- assess_impact: Measure business risk (future tool)
+
+For each issue found, provide:
+1. Description: What exactly is the problem?
+2. Root cause: Why is it happening?
+3. Impact: How does it affect business? (revenue, operations, risk)
+4. Severity: Critical / High / Medium / Low
+5. Recommendation: How to address it
+
+Format as an investigation report. Be specific about evidence and impact.
