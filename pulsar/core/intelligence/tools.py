@@ -43,6 +43,7 @@ class ToolRegistry:
 
     def __init__(self):
         self.tools: Dict[str, ToolDefinition] = {}
+        self.cache: Dict[tuple, Any] = {}  # Cache by (tool_name, params_tuple)
 
     def register(self, tool_def: ToolDefinition) -> None:
         """Register a tool."""
@@ -64,16 +65,38 @@ class ToolRegistry:
             })
         return schemas
 
-    def call(self, tool_name: str, **kwargs) -> Any:
-        """Call a tool by name."""
+    def call(self, tool_name: str, use_cache: bool = True, **kwargs) -> Any:
+        """
+        Call a tool by name with optional caching.
+
+        Cache key: (tool_name, tuple(sorted(kwargs.items())))
+        """
         tool = self.get_tool(tool_name)
         if not tool:
             raise ValueError(f"Tool not found: {tool_name}")
 
+        # Check cache
+        if use_cache:
+            cache_key = (tool_name, tuple(sorted(kwargs.items())))
+            if cache_key in self.cache:
+                logger.debug(f"Cache hit for {tool_name}")
+                return self.cache[cache_key]
+
         logger.debug(f"Calling tool: {tool_name} with args: {kwargs}")
         result = tool.function(**kwargs)
         logger.debug(f"Tool result: {str(result)[:200]}")
+
+        # Cache result
+        if use_cache:
+            cache_key = (tool_name, tuple(sorted(kwargs.items())))
+            self.cache[cache_key] = result
+
         return result
+
+    def clear_cache(self) -> None:
+        """Clear the tool result cache."""
+        self.cache.clear()
+        logger.debug("Tool cache cleared")
 
 
 # Data Analysis Tools
@@ -279,6 +302,108 @@ GET_TOP_VALUES_TOOL = ToolDefinition(
 )
 
 
+# Intelligence Tools (wrap IntelligenceGenerator methods)
+
+def infer_domain(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None) -> str:
+    """Infer what domain/industry this dataset represents."""
+    from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
+    if patterns is None:
+        patterns = {}
+    gen = IntelligenceGenerator(df, patterns)
+    return gen._infer_domain()
+
+
+def identify_key_entities(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None) -> Dict[str, List[str]]:
+    """Identify main entities (key terms, values) in the dataset."""
+    from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
+    if patterns is None:
+        patterns = {}
+    gen = IntelligenceGenerator(df, patterns)
+    return gen._identify_key_entities()
+
+
+def extract_key_metrics(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Extract important numeric metrics from the dataset."""
+    from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
+    if patterns is None:
+        patterns = {}
+    gen = IntelligenceGenerator(df, patterns)
+    return gen._extract_key_metrics()
+
+
+def describe_patterns(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None) -> List[str]:
+    """Describe discovered patterns in the dataset."""
+    from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
+    if patterns is None:
+        patterns = {}
+    gen = IntelligenceGenerator(df, patterns)
+    return gen._describe_patterns()
+
+
+def find_top_performers(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None) -> Dict[str, List[tuple]]:
+    """Find top performing entities by various metrics."""
+    from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
+    if patterns is None:
+        patterns = {}
+    gen = IntelligenceGenerator(df, patterns)
+    return gen._find_top_performers()
+
+
+def explain_outliers(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None) -> List[str]:
+    """Explain what outliers mean and their business significance."""
+    from pulsar.core.intelligence.small_world.intelligence_generator import IntelligenceGenerator
+    if patterns is None:
+        patterns = {}
+    gen = IntelligenceGenerator(df, patterns)
+    return gen._explain_outliers()
+
+
+# Business Analysis Tools (wrap DeepAnalyzer methods)
+
+def analyze_concentration(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None, intelligence: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Analyze market concentration using Herfindahl index."""
+    from pulsar.core.intelligence.small_world.deep_analyzer import DeepAnalyzer
+    if patterns is None:
+        patterns = {}
+    if intelligence is None:
+        intelligence = {}
+    analyzer = DeepAnalyzer(df, patterns, intelligence)
+    return analyzer.analyze_concentration()
+
+
+def analyze_distribution_skewness(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None, intelligence: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Analyze distribution skewness (right-skewed, left-skewed, normal)."""
+    from pulsar.core.intelligence.small_world.deep_analyzer import DeepAnalyzer
+    if patterns is None:
+        patterns = {}
+    if intelligence is None:
+        intelligence = {}
+    analyzer = DeepAnalyzer(df, patterns, intelligence)
+    return analyzer.analyze_distribution_skewness()
+
+
+def analyze_variability(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None, intelligence: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Analyze data consistency and variability."""
+    from pulsar.core.intelligence.small_world.deep_analyzer import DeepAnalyzer
+    if patterns is None:
+        patterns = {}
+    if intelligence is None:
+        intelligence = {}
+    analyzer = DeepAnalyzer(df, patterns, intelligence)
+    return analyzer.analyze_variability()
+
+
+def analyze_relationships(df: pl.DataFrame, patterns: Optional[Dict[str, Any]] = None, intelligence: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Analyze relationships and correlations between columns."""
+    from pulsar.core.intelligence.small_world.deep_analyzer import DeepAnalyzer
+    if patterns is None:
+        patterns = {}
+    if intelligence is None:
+        intelligence = {}
+    analyzer = DeepAnalyzer(df, patterns, intelligence)
+    return analyzer.analyze_relationships()
+
+
 def create_default_registry(df: pl.DataFrame) -> ToolRegistry:
     """Create a registry with standard tools."""
     registry = ToolRegistry()
@@ -332,5 +457,77 @@ def create_default_registry(df: pl.DataFrame) -> ToolRegistry:
     registry.register(wrapped_corr)
     registry.register(wrapped_describe)
     registry.register(wrapped_top)
+
+    # Intelligence tools
+    registry.register(ToolDefinition(
+        name='infer_domain',
+        description='Determine what business domain/industry this dataset represents',
+        parameters=[],
+        function=lambda: infer_domain(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='identify_key_entities',
+        description='Identify main entities and key terms in the dataset',
+        parameters=[],
+        function=lambda: identify_key_entities(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='extract_key_metrics',
+        description='Extract important numeric metrics from the dataset',
+        parameters=[],
+        function=lambda: extract_key_metrics(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='describe_patterns',
+        description='Describe discovered patterns in the dataset',
+        parameters=[],
+        function=lambda: describe_patterns(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='find_top_performers',
+        description='Find top performing entities by various metrics',
+        parameters=[],
+        function=lambda: find_top_performers(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='explain_outliers',
+        description='Explain what outliers mean and their business significance',
+        parameters=[],
+        function=lambda: explain_outliers(df),
+    ))
+
+    # Business analysis tools
+    registry.register(ToolDefinition(
+        name='analyze_concentration',
+        description='Analyze market concentration using Herfindahl index',
+        parameters=[],
+        function=lambda: analyze_concentration(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='analyze_distribution_skewness',
+        description='Analyze distribution skewness (right-skewed, left-skewed, normal)',
+        parameters=[],
+        function=lambda: analyze_distribution_skewness(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='analyze_variability',
+        description='Analyze data consistency and variability',
+        parameters=[],
+        function=lambda: analyze_variability(df),
+    ))
+
+    registry.register(ToolDefinition(
+        name='analyze_relationships',
+        description='Analyze relationships and correlations between columns',
+        parameters=[],
+        function=lambda: analyze_relationships(df),
+    ))
 
     return registry
