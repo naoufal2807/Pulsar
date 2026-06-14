@@ -1,56 +1,35 @@
 # pulsar/core/intelligence/agent.py
 """
-Agent: LLM-powered intelligence backbone for data analysis.
+Agent implementations: ReasoningAgent and backward-compatible Agent alias.
 
-Architecture:
-- Uses pluggable LLM providers (base class: LLMProvider)
-- Maintains conversation memory throughout session
-- Clears memory at end of session
-- First implementation: Ollama with Gemma3:270m
-
-Memory Structure:
-- Stores all messages in conversation
-- Uses memory for context in subsequent calls
-- Each message: {role, content, timestamp}
-- Can be exported and cleared
+Exports:
+- Agent: Backward-compatible alias for ReasoningAgent (for existing code)
+- ReasoningAgent: Full-capability agent with conversation memory
 """
 
 from typing import Any, Dict, List, Optional
 import logging
 from datetime import datetime
-from dataclasses import dataclass
 import json
 
 import polars as pl
 
-from pulsar.core.diagnosis.llm_base import LLMProvider, LLMConfig, LLMProviderType, get_llm_provider
-from pulsar.core.intelligence.tools import ToolRegistry, create_default_registry
+from pulsar.core.intelligence.agent_base import Agent as AgentBase, Message
+from pulsar.core.llm_connectors import LLMConfig
 from pulsar.core.intelligence.function_calls import FunctionCallParser, create_function_definitions
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class Message:
-    """A message in the conversation."""
-    role: str                           # 'user' or 'assistant'
-    content: str                        # Message content
-    timestamp: datetime
-    metadata: Dict[str, Any] = None    # Optional metadata
+# Re-export base class for convenience
+__all__ = ['Agent', 'ReasoningAgent', 'Message']
 
 
-class Agent:
+class ReasoningAgent(AgentBase):
     """
-    LLM-powered agent for data intelligence.
+    Full-capability agent with conversation memory.
 
-    Uses pluggable LLM providers for reasoning.
-    Maintains conversation memory throughout session.
-    Memory is cleared at end of session.
-
-    Architecture:
-    - LLM Provider base class for all implementations
-    - First provider: Ollama with Gemma3:270m
-    - Future providers: OpenAI, Anthropic, Local models, etc.
+    Maintains full conversation history and iterates with tools.
+    Memory strategy: Full conversation history (stores all messages).
     """
 
     def __init__(
@@ -60,64 +39,16 @@ class Agent:
         df: Optional[pl.DataFrame] = None,
         tools_enabled: bool = True,
     ):
-        """
-        Initialize agent with LLM provider and optional tools.
+        """Initialize reasoning agent with full conversation memory."""
+        super().__init__(llm_config, system_prompt, df, tools_enabled)
 
-        Args:
-            llm_config: LLM configuration (defaults to Ollama/Gemma3:270m)
-            system_prompt: System-level instructions for the agent
-            df: DataFrame for tool operations
-            tools_enabled: Enable tool calling capabilities
-        """
-        # Initialize LLM provider
-        if llm_config is None:
-            # Default to Ollama with Gemma3:270m
-            llm_config = LLMConfig(
-                provider_type=LLMProviderType.OLLAMA,
-                model_name="gemma3:270m",
-                base_url="http://localhost:11434",
-                temperature=0.7,
-                max_tokens=1000,
-            )
-
-        try:
-            self.llm_provider = get_llm_provider(llm_config)
-            self.provider_available = self.llm_provider.health_check()
-        except Exception as e:
-            logger.error(f"Failed to initialize LLM provider: {e}")
-            self.llm_provider = None
-            self.provider_available = False
-
-        self.llm_config = llm_config
-
-        # Tool support (must be set before _default_system_prompt)
-        self.df = df
-        self.tools_enabled = tools_enabled
-        self.tool_registry: Optional[ToolRegistry] = None
-        if tools_enabled and df is not None:
-            self.tool_registry = create_default_registry(df)
-            logger.info(f"Tool registry initialized with {len(self.tool_registry.tools)} tools")
-
-        self.system_prompt = system_prompt or self._default_system_prompt()
-
-        # Conversation memory
+    def _init_memory(self) -> None:
+        """Initialize full conversation memory (list of messages)."""
         self.memory: List[Message] = []
-        self.session_start = datetime.now()
-
-        logger.info(
-            f"Agent initialized: {llm_config.model_name} "
-            f"(Provider available: {self.provider_available}, Tools: {tools_enabled})"
-        )
 
     def _default_system_prompt(self) -> str:
-        """Default system prompt for the agent."""
-        prompt = (
-            "You are an intelligent data analysis agent. "
-            "Your role is to analyze data patterns, understand quality issues, "
-            "and provide actionable insights. "
-            "Be concise, specific, and focus on business implications. "
-            "Provide reasoning for your analysis."
-        )
+        """Default system prompt with tool definitions if enabled."""
+        prompt = super()._default_system_prompt()
 
         # Add function calling instructions if tools enabled
         if self.tools_enabled and self.tool_registry:
@@ -311,21 +242,12 @@ class Agent:
         }
 
     def health_check(self) -> Dict[str, Any]:
-        """
-        Check agent and LLM provider health.
-
-        Returns:
-            Health status
-        """
-        return {
-            'agent_status': 'healthy',
-            'llm_provider': self.llm_config.model_name,
-            'provider_available': self.provider_available,
-            'tools_enabled': self.tools_enabled,
-            'tools_available': len(self.tool_registry.tools) if self.tool_registry else 0,
+        """Check agent and LLM provider health."""
+        base_health = super().health_check()
+        base_health.update({
             'memory_size': len(self.memory),
-            'session_duration': (datetime.now() - self.session_start).total_seconds(),
-        }
+        })
+        return base_health
 
     def _execute_function_calls(self, response: str) -> Optional[Dict[str, Any]]:
         """
@@ -376,3 +298,7 @@ class Agent:
         except Exception as e:
             logger.error(f"Error parsing function calls: {e}")
             return None
+
+
+# Backward-compatible alias: Agent now refers to ReasoningAgent
+Agent = ReasoningAgent
