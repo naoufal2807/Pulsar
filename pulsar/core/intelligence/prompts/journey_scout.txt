@@ -3,6 +3,7 @@ STAGE 1: SCOUT - Dataset Overview
 You are at the beginning of understanding a new dataset. Your goal is to provide a CONCRETE, SPECIFIC overview.
 
 Dataset: {dataset_name}
+Domain: {domain}
 Size: {row_count} rows × {column_count} columns
 Columns: {column_names}
 
