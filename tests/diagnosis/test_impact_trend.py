@@ -4,15 +4,22 @@
 import pytest
 from datetime import datetime, timedelta
 
-from pulsar.core.diagnosis.impact_assessor import (
-    ImpactAssessor, ImpactScope, ImpactDomain
-)
-from pulsar.core.diagnosis.trend_analyzer import (
-    TrendAnalyzer, TrendDirection
-)
-from pulsar.core.diagnosis.anomaly_detector import (
-    Anomaly, AnomalyType, AnomalySeverity
-)
+from pulsar.core.diagnosis.impact_assessor import ImpactAssessor
+from pulsar.core.diagnosis.trend_analyzer import TrendAnalyzer, TrendDirection
+from pulsar.core.diagnosis.models import Anomaly, AnomalyType, AnomalySeverity
+
+
+def make_anomaly(column_name="revenue", anomaly_type=AnomalyType.OUTLIER,
+                 severity=3, rows_affected=1):
+    return Anomaly(
+        anomaly_type=anomaly_type,
+        column_name=column_name,
+        value=50000.0,
+        severity=severity,
+        confidence=0.9,
+        description=f"Test anomaly in {column_name}",
+        rows_affected=rows_affected,
+    )
 
 
 class TestImpactAssessor:
@@ -24,100 +31,61 @@ class TestImpactAssessor:
 
     @pytest.fixture
     def sample_anomaly(self):
-        return Anomaly(
-            row_index=10,
-            anomaly_type=AnomalyType.OUTLIER,
-            column_name="revenue",
-            value=50000,
-            expected_range=(1000, 10000),
-            severity=AnomalySeverity.HIGH,
-            confidence=0.9,
-            explanation="Revenue value is outlier",
-        )
-
-    @pytest.fixture
-    def sample_context(self):
-        return {
-            'data_type': 'transaction',
-            'data_purpose': 'business',
-        }
-
-    @pytest.fixture
-    def sample_dataset_info(self):
-        return {
-            'total_rows': 100000,
-        }
+        return make_anomaly()
 
     def test_impact_assessor_creation(self, assessor):
         """Test creating impact assessor."""
         assert assessor is not None
         assert assessor.cost_per_hour == 500
 
-    def test_assess_single_anomaly(self, assessor, sample_anomaly, sample_context, sample_dataset_info):
+    def test_assess_single_anomaly(self, assessor, sample_anomaly):
         """Test assessing impact of single anomaly."""
-        impacts = assessor.assess([sample_anomaly], sample_context, sample_dataset_info)
+        impacts = assessor.assess([sample_anomaly], df_shape=(100, 5))
 
         assert len(impacts) == 1
         impact = impacts[0]
-        assert impact.rows_affected > 0
-        assert impact.severity == AnomalySeverity.HIGH
+        assert impact.affected_rows > 0
+        assert impact.impact_score >= 0
 
-    def test_scope_determination(self, assessor):
-        """Test scope determination."""
-        # Single row anomaly
-        anomaly = Anomaly(
-            row_index=5,
-            anomaly_type=AnomalyType.OUTLIER,
-            column_name="value",
-            value=100,
-            expected_range=(0, 50),
-            severity=AnomalySeverity.LOW,
-            confidence=0.5,
-            explanation="Test",
-        )
+    def test_assess_empty_anomalies(self, assessor):
+        """Test assessing empty anomaly list."""
+        impacts = assessor.assess([], df_shape=(1000, 10))
+        assert impacts == []
 
-        scope = assessor._determine_scope(anomaly, {'total_rows': 10000})
+    def test_assess_returns_impact_per_anomaly(self, assessor):
+        """Test that assess returns one Impact per anomaly."""
+        anomalies = [make_anomaly("col1"), make_anomaly("col2")]
+        impacts = assessor.assess(anomalies, df_shape=(1000, 5))
+        assert len(impacts) == 2
 
-        assert scope == ImpactScope.SINGLE_ROW
+    def test_impact_type_data_quality_for_outlier(self, assessor):
+        """Test outliers map to data_quality impact type."""
+        anomaly = make_anomaly(anomaly_type=AnomalyType.OUTLIER)
+        impacts = assessor.assess([anomaly], df_shape=(100, 3))
 
-    def test_domain_determination(self, assessor):
-        """Test domain determination based on purpose."""
-        business_context = {'data_purpose': 'monetization'}
-        domain = assessor._determine_domain(business_context)
-        assert domain == ImpactDomain.BUSINESS
+        assert impacts[0].impact_type == "data_quality"
 
-        ml_context = {'data_purpose': 'ml'}
-        domain = assessor._determine_domain(ml_context)
-        assert domain == ImpactDomain.ML_MODELS
+    def test_impact_type_business_for_behavioral_shift(self, assessor):
+        """Test behavioral shifts map to business impact type."""
+        anomaly = make_anomaly(anomaly_type=AnomalyType.BEHAVIORAL_SHIFT)
+        impacts = assessor.assess([anomaly], df_shape=(100, 3))
 
-    def test_revenue_impact_calculation(self, assessor):
-        """Test revenue impact calculation."""
-        revenue = assessor._calculate_revenue_impact(100, ImpactDomain.BUSINESS)
+        assert impacts[0].impact_type == "business"
 
-        # 100 rows * $10/row = $1000
-        assert revenue == 1000.0
+    def test_higher_severity_raises_risk_score(self, assessor):
+        """Test that higher severity anomalies have higher impact scores."""
+        low = make_anomaly(severity=int(AnomalySeverity.LOW))
+        high = make_anomaly(severity=int(AnomalySeverity.HIGH))
 
-    def test_prioritize_impacts(self, assessor, sample_anomaly, sample_context, sample_dataset_info):
-        """Test prioritizing impacts by risk."""
-        anomaly1 = sample_anomaly
-        anomaly2 = Anomaly(
-            row_index=-1,  # Column-level anomaly
-            anomaly_type=AnomalyType.BEHAVIORAL_SHIFT,
-            column_name="status",
-            value="unexpected",
-            expected_range=("expected",),
-            severity=AnomalySeverity.CRITICAL,
-            confidence=0.95,
-            explanation="Critical behavioral shift",
-        )
+        impacts_low = assessor.assess([low], df_shape=(1000, 5))
+        impacts_high = assessor.assess([high], df_shape=(1000, 5))
 
-        impacts = assessor.assess([anomaly1, anomaly2], sample_context, sample_dataset_info)
-        prioritized = assessor.prioritize_impacts(impacts)
+        assert impacts_high[0].impact_score > impacts_low[0].impact_score
 
-        # Should have 2 impacts
-        assert len(prioritized) == 2
-        # The highest priority should be the column-level anomaly
-        assert prioritized[0].scope == ImpactScope.COLUMN
+    def test_recovery_effort_within_bounds(self, assessor, sample_anomaly):
+        """Test recovery effort is within 0-10 bounds."""
+        impacts = assessor.assess([sample_anomaly], df_shape=(100, 5))
+        assert 0 <= impacts[0].recovery_effort <= 10
 
 
 class TestTrendAnalyzer:
@@ -129,16 +97,7 @@ class TestTrendAnalyzer:
 
     @pytest.fixture
     def sample_anomaly(self):
-        return Anomaly(
-            row_index=10,
-            anomaly_type=AnomalyType.OUTLIER,
-            column_name="value",
-            value=100,
-            expected_range=(0, 50),
-            severity=AnomalySeverity.MEDIUM,
-            confidence=0.7,
-            explanation="Test outlier",
-        )
+        return make_anomaly(column_name="value", severity=int(AnomalySeverity.MEDIUM))
 
     def test_trend_analyzer_creation(self, analyzer):
         """Test creating trend analyzer."""
@@ -148,7 +107,6 @@ class TestTrendAnalyzer:
     def test_add_anomaly(self, analyzer, sample_anomaly):
         """Test adding anomaly to history."""
         analyzer.add_anomaly(sample_anomaly)
-
         assert len(analyzer.anomaly_history) == 1
 
     def test_analyze_single_anomaly(self, analyzer, sample_anomaly):
@@ -163,7 +121,6 @@ class TestTrendAnalyzer:
 
     def test_analyze_multiple_anomalies(self, analyzer, sample_anomaly):
         """Test analyzing trend with multiple anomalies."""
-        # Add multiple anomalies
         for _ in range(5):
             analyzer.add_anomaly(sample_anomaly)
 
@@ -173,36 +130,39 @@ class TestTrendAnalyzer:
         trend = trends[0]
         assert trend.count_last_day == 5
 
+    def test_analyze_empty_history(self, analyzer):
+        """Test analyzing empty anomaly history."""
+        trends = analyzer.analyze_trends()
+        assert trends == []
+
     def test_clustering_calculation(self, analyzer):
         """Test clustering coefficient calculation."""
         anomalies = [
             (datetime.now() - timedelta(hours=2), None),
-            (datetime.now() - timedelta(hours=1.5), None),
+            (datetime.now() - timedelta(hours=1, minutes=30), None),
             (datetime.now() - timedelta(hours=1), None),
         ]
 
         clustering = analyzer._calculate_clustering(anomalies)
-
-        # Clustered anomalies should have high coefficient
         assert 0 <= clustering <= 1
 
-    def test_trend_direction_determination(self, analyzer):
-        """Test trend direction determination."""
-        # Degrading: high count in last hour
+    def test_trend_direction_critical(self, analyzer):
+        """Test CRITICAL direction when many anomalies in last hour."""
         direction = analyzer._determine_trend_direction(5, 10, 0.5)
         assert direction == TrendDirection.CRITICAL
 
-        # Improving: no recent anomalies
+    def test_trend_direction_improving(self, analyzer):
+        """Test IMPROVING direction when no anomalies in last day."""
         direction = analyzer._determine_trend_direction(0, 0, 0.0)
         assert direction == TrendDirection.IMPROVING
 
-        # Stable: some anomalies, steady rate
+    def test_trend_direction_stable(self, analyzer):
+        """Test STABLE direction for moderate, steady rate."""
         direction = analyzer._determine_trend_direction(1, 5, 0.1)
         assert direction == TrendDirection.STABLE
 
     def test_predict_next_occurrence(self, analyzer):
         """Test predicting next anomaly."""
-        # Create regular anomalies
         now = datetime.now()
         anomalies = [
             (now - timedelta(hours=4), None),
@@ -213,23 +173,15 @@ class TestTrendAnalyzer:
 
         predicted_hours, confidence = analyzer._predict_next_occurrence(anomalies)
 
-        # Should predict within next hour (based on 1-hour pattern)
         assert predicted_hours is None or predicted_hours >= 0
         assert 0 <= confidence <= 1
 
-    def test_get_critical_trends(self, analyzer):
-        """Test filtering critical trends."""
-        # Create multiple trends and filter
-        trends = [
-            type('Trend', (), {'direction': TrendDirection.IMPROVING})(),
-            type('Trend', (), {'direction': TrendDirection.CRITICAL})(),
-            type('Trend', (), {'direction': TrendDirection.DEGRADING})(),
-        ]
-
-        # Would need actual trend objects with direction attribute
-        critical = [t for t in trends if hasattr(t, 'direction') and t.direction in [TrendDirection.CRITICAL, TrendDirection.DEGRADING]]
-
-        assert len(critical) == 2
+    def test_predict_single_anomaly_returns_none(self, analyzer):
+        """Test that single anomaly gives no prediction."""
+        anomalies = [(datetime.now(), None)]
+        predicted_hours, confidence = analyzer._predict_next_occurrence(anomalies)
+        assert predicted_hours is None
+        assert confidence == 0.0
 
 
 class TestImpactTrendIntegration:
@@ -240,74 +192,15 @@ class TestImpactTrendIntegration:
         assessor = ImpactAssessor()
         analyzer = TrendAnalyzer()
 
-        # Create anomalies
-        anomalies = [
-            Anomaly(
-                row_index=i,
-                anomaly_type=AnomalyType.OUTLIER,
-                column_name="value",
-                value=100 + i,
-                expected_range=(0, 50),
-                severity=AnomalySeverity.MEDIUM,
-                confidence=0.7,
-                explanation="Test outlier",
-            )
-            for i in range(5)
-        ]
+        anomalies = [make_anomaly("value", severity=int(AnomalySeverity.MEDIUM))
+                     for _ in range(5)]
 
-        # Assess impact
-        context = {'data_purpose': 'business'}
-        dataset_info = {'total_rows': 10000}
-        impacts = assessor.assess(anomalies, context, dataset_info)
+        impacts = assessor.assess(anomalies, df_shape=(10000, 5))
 
-        # Analyze trends
         for anomaly in anomalies:
             analyzer.add_anomaly(anomaly)
         trends = analyzer.analyze_trends()
 
-        # Should have 5 impacts (one per anomaly) and 1 trend (same column/type)
         assert len(impacts) == 5
         assert len(trends) == 1
         assert trends[0].count_last_day == 5
-
-
-class TestEdgeCases:
-    """Test edge cases."""
-
-    def test_impact_assessor_empty_anomalies(self):
-        """Test assessing empty anomaly list."""
-        assessor = ImpactAssessor()
-        impacts = assessor.assess([], {}, {})
-
-        assert impacts == []
-
-    def test_trend_analyzer_empty_history(self):
-        """Test analyzing empty anomaly history."""
-        analyzer = TrendAnalyzer()
-        trends = analyzer.analyze_trends()
-
-        assert trends == []
-
-    def test_impact_with_no_revenue(self):
-        """Test impact assessment with non-business domain."""
-        assessor = ImpactAssessor()
-
-        anomaly = Anomaly(
-            row_index=0,
-            anomaly_type=AnomalyType.OUTLIER,
-            column_name="metric",
-            value=100,
-            expected_range=(0, 50),
-            severity=AnomalySeverity.LOW,
-            confidence=0.5,
-            explanation="Test",
-        )
-
-        context = {'data_purpose': 'operations'}
-        dataset_info = {'total_rows': 1000}
-
-        impacts = assessor.assess([anomaly], context, dataset_info)
-
-        # Should have impact but no revenue
-        assert len(impacts) == 1
-        assert impacts[0].revenue_impact is None or impacts[0].revenue_impact == 0

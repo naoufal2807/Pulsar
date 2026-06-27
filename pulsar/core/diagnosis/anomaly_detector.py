@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 import logging
 
 import polars as pl
-from .models import Anomaly, AnomalyType
+from .models import Anomaly, AnomalyType, AnomalySeverity
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +28,9 @@ class AnomalyDetector:
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize anomaly detector.
-
-        Args:
-            config: Optional configuration dictionary
-        """
         self.config = config or {}
-        self.outlier_threshold = self.config.get('outlier_threshold', 1.5)
+        self.iqr_multiplier = self.config.get('iqr_multiplier', 1.5)
+        self.zscore_threshold = self.config.get('zscore_threshold', 3.0)
         self.shift_threshold = self.config.get('shift_threshold', 0.3)
         self.logger = logger
 
@@ -45,11 +40,12 @@ class AnomalyDetector:
         patterns: Dict[str, Any],
     ) -> List[Anomaly]:
         """
-        Detect statistical outliers.
+        Detect statistical outliers using z-score against baseline stats.
 
         Args:
             df: DataFrame to analyze
-            patterns: Patterns from Learner
+            patterns: Dict mapping column name to stats dict with keys:
+                      type, mean, std (and optionally min/max)
 
         Returns:
             List of Anomaly objects
@@ -57,36 +53,37 @@ class AnomalyDetector:
         anomalies = []
 
         try:
-            ranges = patterns.get('ranges', {})
-
-            for col_name, col_info in ranges.items():
+            for col_name, col_info in patterns.items():
                 if col_info.get('type') != 'numeric':
                     continue
+                if col_name not in df.columns:
+                    continue
 
-                col_data = df[col_name]
+                mean = col_info.get('mean', 0)
+                std = col_info.get('std', 0)
+                if std == 0:
+                    continue
 
-                # Calculate bounds using IQR
-                q1 = col_data.quantile(0.25)
-                q3 = col_data.quantile(0.75)
-                iqr = q3 - q1
-                lower = q1 - self.outlier_threshold * iqr
-                upper = q3 + self.outlier_threshold * iqr
-
-                # Find outliers
-                outlier_mask = (col_data < lower) | (col_data > upper)
-                outlier_indices = df.with_row_index().filter(outlier_mask)['index'].to_list()
-
-                if outlier_indices:
-                    for idx in outlier_indices[:5]:  # Limit to 5 per column
-                        value = col_data[idx]
+                col_data = df[col_name].drop_nulls()
+                for value in col_data.to_list():
+                    zscore = abs(float(value) - mean) / std
+                    if zscore > self.zscore_threshold:
+                        if zscore > self.zscore_threshold * 1.5:
+                            sev = AnomalySeverity.HIGH
+                        else:
+                            sev = AnomalySeverity.MEDIUM
+                        confidence = min(zscore / (self.zscore_threshold * 2), 1.0)
                         anomalies.append(Anomaly(
                             anomaly_type=AnomalyType.OUTLIER,
                             column_name=col_name,
-                            value=float(value) if value is not None else None,
-                            severity=self._calculate_severity(value, lower, upper),
-                            description=f"Value {value} outside range [{lower:.2f}, {upper:.2f}]",
+                            value=float(value),
+                            severity=int(sev),
+                            confidence=confidence,
+                            description=(
+                                f"Value {value} is {zscore:.1f} std devs "
+                                f"from mean ({mean})"
+                            ),
                             rows_affected=1,
-                            metadata={'index': int(idx), 'bounds': [float(lower), float(upper)]}
                         ))
 
         except Exception as e:

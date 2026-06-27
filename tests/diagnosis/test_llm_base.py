@@ -43,7 +43,6 @@ class TestLLMConfig:
         )
 
         assert config.timeout == 30
-        assert config.retry_count == 3
         assert config.metadata == {}
 
 
@@ -162,27 +161,18 @@ class TestOllamaProviderMethods:
             # Expected if Ollama not running
             assert "generation failed" in str(e).lower() or "ollama" in str(e).lower()
 
-    def test_ollama_chat_completion_not_available(self, config):
-        """Test chat completion when Ollama not available."""
+    def test_ollama_generate_not_available(self, config):
+        """Test generate when Ollama not available."""
         provider = OllamaProvider(config)
 
-        messages = [{"role": "user", "content": "Hello"}]
-
         try:
-            result = provider.chat_completion(messages)
+            result = provider.generate("Hello")
             assert isinstance(result, str)
         except RuntimeError:
-            # Expected if Ollama not running
             pass
 
-    def test_ollama_embed_not_supported(self, config):
-        """Test embeddings raise NotImplementedError."""
+    def test_ollama_health_check_when_unavailable(self, config):
+        """Test health check returns False when Ollama not running."""
         provider = OllamaProvider(config)
-
-        try:
-            result = provider.embed("Hello world")
-            # Some Ollama versions might support it
-            assert isinstance(result, list)
-        except NotImplementedError:
-            # Expected if embeddings not supported
-            pass
+        health = provider.health_check()
+        assert isinstance(health, bool)

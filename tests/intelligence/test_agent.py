@@ -16,7 +16,7 @@ class TestAgent:
         agent = Agent()
 
         assert agent.llm_config is not None
-        assert agent.llm_config.model_name == "gemma3:270m"
+        assert agent.llm_config.model_name == "minimax-m3:cloud"
         assert agent.llm_config.provider_type == LLMProviderType.OLLAMA
         assert len(agent.memory) == 0
 
@@ -133,7 +133,7 @@ class TestAgent:
         health = agent.health_check()
 
         assert health['agent_status'] == 'healthy'
-        assert 'llm_provider' in health
+        assert 'llm_model' in health
         assert 'provider_available' in health
         assert 'memory_size' in health
 
@@ -146,7 +146,7 @@ class TestAgent:
 
         session = agent.export_session()
 
-        assert session['model'] == "gemma3:270m"
+        assert session['model'] == "minimax-m3:cloud"
         assert session['provider_type'] == "ollama"
         assert session['total_messages'] == 2
         assert 'messages' in session

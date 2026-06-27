@@ -22,13 +22,22 @@ class AnomalyType(str, Enum):
     FORMAT_VIOLATION = "format_violation"
 
 
+class AnomalySeverity(int, Enum):
+    """Severity levels for anomalies (integer for comparison)."""
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+    CRITICAL = 4
+
+
 class Anomaly(BaseModel):
     """Anomaly detected in data."""
     id: str = Field(default_factory=lambda: str(datetime.now().timestamp()))
     anomaly_type: AnomalyType
     column_name: str
     value: Any = None
-    severity: int = Field(ge=0, le=4)  # 0-4 scale
+    severity: int = Field(ge=0, le=4)  # 0-4 scale; compare with AnomalySeverity
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     description: str
     rows_affected: int = 1
     detected_at: datetime = Field(default_factory=datetime.now)

@@ -4,9 +4,9 @@
 import pytest
 import polars as pl
 
-from pulsar.core.intelligence.agent import Agent
+from pulsar.core.intelligence.agent import Agent, FunctionCallParser
 from pulsar.core.intelligence.tools import (
-    ToolRegistry, ToolDefinition, ToolParameter,
+    ToolRegistry,
     create_default_registry,
     compute_statistics, check_data_quality,
     detect_outliers, analyze_correlation,
@@ -39,7 +39,7 @@ class TestToolRegistry:
         assert 'compute_statistics' in registry.tools
         assert 'check_data_quality' in registry.tools
         assert 'detect_outliers' in registry.tools
-        assert len(registry.tools) == 6
+        assert len(registry.tools) == 16
 
     def test_get_tool(self, sample_df):
         """Test retrieving a tool."""
@@ -54,7 +54,7 @@ class TestToolRegistry:
         registry = create_default_registry(sample_df)
 
         schemas = registry.get_schemas()
-        assert len(schemas) == 6
+        assert len(schemas) == 16
 
         # Check schema structure
         schema = schemas[0]
@@ -129,44 +129,39 @@ class TestAgentToolCalling:
 
         assert agent.tools_enabled is True
         assert agent.tool_registry is not None
-        assert len(agent.tool_registry.tools) == 6
+        assert len(agent.tool_registry.tools) == 16
 
-    def test_parse_tool_args(self, sample_df):
-        """Test parsing tool arguments."""
-        agent = Agent(df=sample_df, tools_enabled=True)
+    def test_parse_function_calls(self, sample_df):
+        """Test parsing JSON function calls from LLM response (array format)."""
+        response = '[{"function": "compute_statistics", "parameters": {"column": "value"}}]'
+        calls = FunctionCallParser.extract_function_calls(response)
 
-        # Test various argument formats
-        args = agent._parse_tool_args('column=value, limit=10')
-        assert args['column'] == 'value'
-        assert args['limit'] == 10
-
-        args = agent._parse_tool_args('col1="my column", col2=score')
-        assert args['col1'] == 'my column'
-        assert args['col2'] == 'score'
+        assert len(calls) == 1
+        assert calls[0].function == 'compute_statistics'
+        assert calls[0].parameters == {'column': 'value'}
 
     def test_execute_tool_calls(self, sample_df):
-        """Test executing tool calls from LLM response."""
+        """Test executing function calls from LLM response."""
         agent = Agent(df=sample_df, tools_enabled=True)
 
-        # Simulate LLM response with tool call
-        response = "Let me analyze the data. [TOOL: compute_statistics(column=value)]"
-        results = agent._execute_tool_calls(response)
+        response = '[{"function": "compute_statistics", "parameters": {"column": "value"}}]'
+        results = agent._execute_function_calls(response)
 
         assert results is not None
         assert 'compute_statistics' in results
         assert results['compute_statistics']['column'] == 'value'
 
     def test_execute_multiple_tool_calls(self, sample_df):
-        """Test executing multiple tool calls."""
+        """Test executing multiple function calls."""
         agent = Agent(df=sample_df, tools_enabled=True)
 
         response = (
-            "Let me analyze this. "
-            "[TOOL: compute_statistics(column=value)] "
-            "[TOOL: check_data_quality(column=category)]"
+            '[{"function": "compute_statistics", "parameters": {"column": "value"}}, '
+            '{"function": "check_data_quality", "parameters": {"column": "category"}}]'
         )
-        results = agent._execute_tool_calls(response)
+        results = agent._execute_function_calls(response)
 
+        assert results is not None
         assert len(results) == 2
         assert 'compute_statistics' in results
         assert 'check_data_quality' in results
@@ -177,7 +172,7 @@ class TestAgentToolCalling:
 
         health = agent.health_check()
         assert health['tools_enabled'] is True
-        assert health['tools_available'] == 6
+        assert health['tools_available'] == 16
 
     def test_agent_think_with_tools_fallback(self, sample_df):
         """Test agent think with tools enabled but provider unavailable."""
