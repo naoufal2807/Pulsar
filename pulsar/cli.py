@@ -12,6 +12,11 @@ from pulsar.core.ingestion.loader import load
 from pulsar.core.quality.loader import load_rules_yaml
 from pulsar.core.quality.validator import Validator
 from pulsar.output.formatter import format_validation_output
+from pulsar.core.presentation import JourneyPresenter
+from pulsar.core.intelligence.run_persistence import RunPersistence
+from pulsar.core.journey_orchestrator import Journey
+from pulsar.core.intelligence.shared_state_store import SharedStateStore
+from pulsar.core.intelligence.stage_agents import AceAgent
 
 app = typer.Typer(help="Pulsar - Data Quality CLI")
 logger = get_logger("pulsar.cli")
@@ -409,18 +414,63 @@ def infer(
 
 @app.command()
 def journey(
-    file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
+    file: Optional[str] = typer.Argument(None, help="Path to data file (CSV/Parquet)"),
     stage: Optional[str] = typer.Option(None, help="Start at specific stage: scout, explorer, detective, analyst, ace"),
     full: bool = typer.Option(False, "--full", help="Run complete journey from SCOUT to ACE"),
     save: bool = typer.Option(False, "--save", help="Save journey report to file"),
+    resume: Optional[str] = typer.Option(None, "--resume", help="Resume from checkpoint (run_id)"),
+    list_runs: bool = typer.Option(False, "--list-runs", help="List all saved journey runs"),
     log_file: Optional[str] = typer.Option(None, help="Log file path"),
 ):
     """Explore your data on a guided journey from Zero to Ace understanding."""
+
+    # Handle --list-runs flag
+    if list_runs:
+        persistence = RunPersistence()
+        runs = persistence.list_runs()
+
+        if not runs:
+            print("\n[INFO] No saved runs found\n")
+            return
+
+        print("\n" + "="*100)
+        print("SAVED JOURNEY RUNS")
+        print("="*100 + "\n")
+        print(f"{'Dataset':<15} {'Run ID':<20} {'Status':<15} {'Progress':<12} {'Last Updated':<25} {'Stages':<30}")
+        print("-"*100)
+
+        for run in runs:
+            stages_str = ", ".join(run['completed_stages']).upper()
+            print(f"{run['dataset']:<15} {run['run_id']:<20} {run['status']:<15} {run['progress']}%{'':<9} {run['start_time']:<25} {stages_str:<30}")
+
+        print("\n" + "="*100)
+        print("To resume a run: uv run pulsar.cli journey DATA.csv --resume <run_id>\n")
+        return
     log_path = setup_logging(log_file or "logs")
-    logger.info(f"Journey command: file={file}, stage={stage}, full={full}")
+    logger.info(f"Journey command: file={file}, stage={stage}, full={full}, resume={resume}")
 
     try:
         from pulsar.core.intelligence.journey import DataExplorationJourney, Stage
+
+        # Handle resume mode
+        if resume:
+            if not file:
+                typer.echo("[ERROR] Must provide data file when resuming", err=True)
+                raise typer.Exit(code=1)
+
+            # Verify run exists
+            persistence = RunPersistence()
+            dataset_name = Path(file).stem
+            metadata = persistence.get_run_metadata(dataset_name, resume)
+
+            if not metadata:
+                typer.echo(f"[ERROR] Run not found: {dataset_name}/{resume}", err=True)
+                raise typer.Exit(code=1)
+
+            logger.info(f"Resuming run: {dataset_name}/{resume}, completed stages: {metadata.completed_stages}")
+            print(f"\n[RESUME] Resuming journey '{dataset_name}' from run {resume}")
+            print(f"[RESUME] Completed stages: {', '.join(metadata.completed_stages).upper()}")
+            print(f"[RESUME] Progress: {len(metadata.completed_stages) * 20}%\n")
 
         # Load data
         lf = load(file)
@@ -428,8 +478,8 @@ def journey(
         dataset_name = Path(file).stem
         logger.info(f"File loaded: {file}")
 
-        # Initialize journey
-        journey_obj = DataExplorationJourney(df, dataset_name)
+        # Initialize journey (with resume support)
+        journey_obj = DataExplorationJourney(df, dataset_name, run_id=resume)
         logger.info(f"Journey initialized for {dataset_name}")
 
         # Run appropriate stage
@@ -473,16 +523,18 @@ def journey(
             print(f"\n[OK] Journey report saved: {report_path}")
             logger.info(f"Report saved: {report_path}")
 
-        # Show summary
+        # Show summary using presenter
         summary = journey_obj.get_journey_summary()
-        print(f"\n{'='*80}")
-        print(f"Journey Summary")
-        print(f"{'='*80}")
-        print(f"Dataset: {summary['dataset']}")
-        print(f"Size: {summary['total_rows']:,} rows × {summary['total_columns']} columns")
-        print(f"Stage: {summary['current_stage'].upper()}")
-        print(f"Progress: {summary['progress_percent']}%")
-        print(f"Insights Gained: {summary['total_insights']}")
+        presenter = JourneyPresenter(dataset_name)
+        summary_output = presenter.present_summary(
+            dataset_name=summary['dataset'],
+            rows=summary['total_rows'],
+            cols=summary['total_columns'],
+            current_stage=summary['current_stage'],
+            progress=summary['progress_percent'],
+            insights_count=summary['total_insights'],
+        )
+        print(summary_output)
 
     except FileNotFoundError as e:
         logger.error(f"File not found: {e}")
@@ -492,6 +544,238 @@ def journey(
         logger.error(f"Journey error: {e}", exc_info=True)
         typer.echo(f"[ERROR] {e}", err=True)
         raise typer.Exit(code=1)
+
+
+@app.command()
+def chat(
+    file: Optional[str] = typer.Option(None, help="Path to data file (CSV/Parquet)"),
+    skip_journey: bool = typer.Option(False, help="Skip journey and go directly to chat"),
+    log_file: Optional[str] = typer.Option(None, help="Log file path"),
+):
+    """Start interactive chat with agents for data analysis."""
+    log_path = setup_logging(log_file or "logs")
+    logger.info(f"Chat command: file={file}, skip_journey={skip_journey}")
+
+    df = None
+    shared_state = None
+
+    try:
+        if not skip_journey and file:
+            # Load dataset
+            logger.info(f"Loading dataset: {file}")
+            try:
+                lf = load(file)
+                df = lf.collect()
+                logger.info(f"Dataset loaded: {df.shape[0]} rows, {df.shape[1]} columns")
+            except Exception as e:
+                logger.error(f"Failed to load dataset: {e}")
+                typer.echo(f"❌ Error loading dataset: {e}", err=True)
+                raise typer.Exit(code=1)
+
+            # Run journey
+            dataset_name = Path(file).stem
+            journey_obj = Journey(
+                dataset_name=dataset_name,
+                df=df,
+            )
+
+            logger.info("Starting journey...")
+            try:
+                results = journey_obj.execute()
+                shared_state = journey_obj.shared_state
+                logger.info("Journey completed successfully!")
+                print("\n✓ Journey completed successfully!")
+                print(f"  Stages: {len(results['results'])} completed")
+                print(f"  Memory: {results['shared_state_stats']['total_mb']:.2f} MB")
+            except Exception as e:
+                logger.error(f"Journey failed: {e}")
+                typer.echo(f"❌ Journey error: {e}", err=True)
+                raise typer.Exit(code=1)
+        else:
+            # Create empty shared state for chat-only mode
+            shared_state = SharedStateStore()
+            logger.info("Chat mode: no journey. Using empty shared state.")
+
+        # Start interactive chat
+        logger.info("Starting interactive chat...")
+        _start_interactive_chat(shared_state)
+
+    except Exception as e:
+        logger.error(f"Chat error: {e}", exc_info=True)
+        typer.echo(f"❌ Error: {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+def _start_interactive_chat(shared_state: SharedStateStore):
+    """Start the interactive chat loop."""
+    agent = AceAgent(
+        shared_state=shared_state,
+        conversation_id="chat_session",
+    )
+
+    print("\n" + "=" * 60)
+    print("INTERACTIVE CHAT MODE")
+    print("=" * 60)
+    print("Type your questions below. Commands:")
+    print("  /context - Show current context")
+    print("  /keys - List all available keys")
+    print("  /help - Show this help")
+    print("  /quit - Exit chat")
+    print("=" * 60 + "\n")
+
+    while True:
+        try:
+            user_input = input("You: ").strip()
+
+            if not user_input:
+                continue
+
+            if user_input.lower() == "/quit":
+                print("\nGoodbye!")
+                break
+            elif user_input.lower() == "/help":
+                print("\nCommands:")
+                print("  /context - Show current context")
+                print("  /keys - List all available keys")
+                print("  /help - Show this help")
+                print("  /quit - Exit chat\n")
+            elif user_input.lower() == "/context":
+                stats = shared_state.get_stats()
+                print("\n" + "=" * 60)
+                print("SHARED STATE CONTEXT")
+                print("=" * 60)
+                print(f"Total keys: {stats['total_keys']}")
+                print(f"Memory used: {stats['total_mb']:.2f} MB")
+                print(f"Total accesses: {stats['total_accesses']}")
+                print(f"\nKeys by stage:")
+                for stage, count in stats["writes_by_stage"].items():
+                    print(f"  {stage}: {count} keys")
+                print("=" * 60 + "\n")
+            elif user_input.lower() == "/keys":
+                keys = shared_state.keys()
+                print("\nAvailable keys:")
+                for key in sorted(keys):
+                    print(f"  - {key}")
+                print()
+            else:
+                # Send message to agent
+                print("\nAgent: Thinking...", end="", flush=True)
+                response = agent.think(user_input)
+                print("\r" + " " * 30, end="\r")  # Clear "Thinking..."
+                print(f"Agent: {response}\n")
+
+        except KeyboardInterrupt:
+            print("\n\nGoodbye!")
+            break
+        except Exception as e:
+            logger.error(f"Chat error: {e}")
+            print(f"Error: {e}\n")
+
+
+@app.command()
+def scout(
+    file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
+    mode: str = typer.Option("scout", help="Analysis mode: scout, schema, quality, stats"),
+    save: bool = typer.Option(False, "--save", help="Save verdict to file"),
+    log_file: Optional[str] = typer.Option(None, help="Log file path"),
+):
+    """
+    Run multi-agent dataset onboarding intelligence.
+
+    Concurrently runs SchemaAgent + QualityAgent + StatsAgent, then
+    NarratorAgent synthesizes a 5-sentence verdict.
+    """
+    import asyncio
+    import sys
+
+    log_path = setup_logging(log_file or "logs")
+    logger.info(f"Scout command: file={file}, mode={mode}")
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    try:
+        asyncio.run(_run_scout(file, mode, save))
+    except Exception as e:
+        logger.error(f"Scout error: {e}", exc_info=True)
+        typer.echo(f"[ERROR] {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+async def _run_scout(file: str, mode: str, save: bool) -> None:
+    """Async implementation: concurrent tier-1 agents then tier-2 narrator."""
+    import asyncio
+    from pulsar.core.intelligence.agent_registry import AgentRegistry
+    from pulsar.core.intelligence.question_router import get_tiers, TIER1_QUESTION
+    from pulsar.core.intelligence.narrator_agent import NarratorAgent
+
+    lf = load(file)
+    df = lf.collect()
+    dataset_name = Path(file).stem
+
+    shared_state = SharedStateStore()
+
+    tier1_keys, tier2_keys = get_tiers(mode)
+
+    typer.echo(f"\n[SCOUT] Dataset: {dataset_name}  ({df.shape[0]:,} rows × {df.shape[1]} cols)")
+    typer.echo(f"[SCOUT] Running agents: {', '.join(tier1_keys)}" + (
+        f" → {', '.join(tier2_keys)}" if tier2_keys else ""
+    ))
+
+    # ── Tier 1: concurrent ───────────────────────────────────────────────────
+    tier1_agents = [
+        AgentRegistry.get_agent(key, df=df, shared_state=shared_state)
+        for key in tier1_keys
+    ]
+
+    typer.echo(f"[SCOUT] Tier 1: {len(tier1_agents)} agents running concurrently…")
+
+    tier1_results = await asyncio.gather(
+        *[
+            asyncio.to_thread(
+                agent.think,
+                TIER1_QUESTION.get(key, f"Analyze the dataset for {key} insights."),
+            )
+            for key, agent in zip(tier1_keys, tier1_agents)
+        ],
+        return_exceptions=True,
+    )
+
+    for key, result in zip(tier1_keys, tier1_results):
+        if isinstance(result, Exception):
+            logger.warning(f"[SCOUT] {key} agent failed: {result}")
+            typer.echo(f"  [WARN] {key}: {result}", err=True)
+        else:
+            typer.echo(f"  [OK] {key} analysis complete")
+
+    # ── Tier 2: sequential (narrator reads tier-1 shared state) ─────────────
+    verdict = ""
+    if tier2_keys:
+        typer.echo(f"[SCOUT] Tier 2: narrator synthesizing verdict…")
+        narrator = NarratorAgent(df=df, shared_state=shared_state)
+        try:
+            verdict = narrator.synthesize()
+        except Exception as e:
+            logger.error(f"[SCOUT] Narrator failed: {e}")
+            verdict = "[Narrator unavailable — check LLM connection]"
+
+    # ── Output ────────────────────────────────────────────────────────────────
+    separator = "=" * 70
+    typer.echo(f"\n{separator}")
+    typer.echo(f"  SCOUT VERDICT — {dataset_name}")
+    typer.echo(f"{separator}\n")
+    typer.echo(verdict or "\n".join(
+        f"[{k.upper()}]\n{r}" for k, r in zip(tier1_keys, tier1_results)
+        if not isinstance(r, Exception)
+    ))
+    typer.echo(f"\n{separator}\n")
+
+    if save:
+        report_path = Path(f"journey_reports/{dataset_name}_scout.md")
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(verdict or "")
+        typer.echo(f"[OK] Saved: {report_path}")
+        logger.info(f"Scout report saved: {report_path}")
 
 
 if __name__ == "__main__":

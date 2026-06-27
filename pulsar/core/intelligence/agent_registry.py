@@ -12,6 +12,7 @@ from pulsar.core.intelligence.diagnosis_agent import DiagnosisAgent
 from pulsar.core.intelligence.schema_agent import SchemaAgent
 from pulsar.core.intelligence.quality_agent import QualityAgent
 from pulsar.core.intelligence.stats_agent import StatsAgent
+from pulsar.core.intelligence.narrator_agent import NarratorAgent
 from pulsar.core.llm_connectors import LLMConfig
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class AgentRegistry:
         'schema':    SchemaAgent,         # Structural identity, domain, entities
         'quality':   QualityAgent,        # Nulls, outliers, integrity
         'stats':     StatsAgent,          # Distributions, correlations, variability
+        'narrator':  NarratorAgent,       # Synthesis verdict (reads tier-1 state)
         # Diagnosis tier (Phase 5, kept)
         'reasoning': ReasoningAgent,      # Full conversation, iterative tools
         'analysis':  AnalysisAgent,       # Lightweight, single-shot
