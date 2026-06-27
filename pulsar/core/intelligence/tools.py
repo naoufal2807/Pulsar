@@ -9,8 +9,9 @@ Domain tool functions now live in:
                      analyze_concentration, analyze_distribution_skewness,
                      analyze_variability, analyze_relationships, find_top_performers
 
-create_default_registry() is kept here for backward compatibility;
-it will be removed on Day 5 once each agent has its own _create_registry().
+create_default_registry() is kept for backward compatibility with
+journey.py and agent_base.py. Domain agents (SchemaAgent, QualityAgent,
+StatsAgent) each have their own _create_registry() and never call this.
 """
 
 from typing import Any, Dict, List, Optional, Callable, Tuple

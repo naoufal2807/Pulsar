@@ -673,6 +673,41 @@ def _start_interactive_chat(shared_state: SharedStateStore):
 
 
 @app.command()
+def analyze(
+    file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
+    mode: str = typer.Option(
+        "scout",
+        help="Analysis mode: scout, schema, quality, stats, narrator",
+    ),
+    save: bool = typer.Option(False, "--save", help="Save verdict to file"),
+    log_file: Optional[str] = typer.Option(None, help="Log file path"),
+):
+    """
+    Run multi-agent analysis on a dataset.
+
+    --mode scout    : full onboarding (schema+quality+stats → narrator)
+    --mode schema   : structural identity only
+    --mode quality  : data-quality audit only
+    --mode stats    : statistical profiling only
+    """
+    import asyncio
+    import sys
+
+    log_path = setup_logging(log_file or "logs")
+    logger.info(f"Analyze command: file={file}, mode={mode}")
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    try:
+        asyncio.run(_run_scout(file, mode, save))
+    except Exception as e:
+        logger.error(f"Analyze error: {e}", exc_info=True)
+        typer.echo(f"[ERROR] {e}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def scout(
     file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
     mode: str = typer.Option("scout", help="Analysis mode: scout, schema, quality, stats"),
