@@ -9,6 +9,7 @@ from pulsar.core.intelligence.agent_base import Agent
 from pulsar.core.intelligence.agent import ReasoningAgent
 from pulsar.core.intelligence.analysis_agent import AnalysisAgent
 from pulsar.core.intelligence.diagnosis_agent import DiagnosisAgent
+from pulsar.core.intelligence.schema_agent import SchemaAgent
 from pulsar.core.llm_connectors import LLMConfig
 
 logger = logging.getLogger(__name__)
@@ -18,10 +19,13 @@ class AgentRegistry:
     """Factory for creating agent instances."""
 
     _agents: Dict[str, Type[Agent]] = {
+        # Journey specialists (Days 2-4)
+        'schema':    SchemaAgent,         # Structural identity, domain, entities
+        # Diagnosis tier (Phase 5, kept)
         'reasoning': ReasoningAgent,      # Full conversation, iterative tools
-        'analysis': AnalysisAgent,        # Lightweight, single-shot
+        'analysis':  AnalysisAgent,       # Lightweight, single-shot
         'diagnosis': DiagnosisAgent,      # Problem-focused, up to 2 iterations
-        'default': ReasoningAgent,        # Default agent type
+        'default':   ReasoningAgent,      # Default agent type
     }
 
     @classmethod
