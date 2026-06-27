@@ -10,6 +10,8 @@ from pulsar.core.intelligence.agent import ReasoningAgent
 from pulsar.core.intelligence.analysis_agent import AnalysisAgent
 from pulsar.core.intelligence.diagnosis_agent import DiagnosisAgent
 from pulsar.core.intelligence.schema_agent import SchemaAgent
+from pulsar.core.intelligence.quality_agent import QualityAgent
+from pulsar.core.intelligence.stats_agent import StatsAgent
 from pulsar.core.llm_connectors import LLMConfig
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,8 @@ class AgentRegistry:
     _agents: Dict[str, Type[Agent]] = {
         # Journey specialists (Days 2-4)
         'schema':    SchemaAgent,         # Structural identity, domain, entities
+        'quality':   QualityAgent,        # Nulls, outliers, integrity
+        'stats':     StatsAgent,          # Distributions, correlations, variability
         # Diagnosis tier (Phase 5, kept)
         'reasoning': ReasoningAgent,      # Full conversation, iterative tools
         'analysis':  AnalysisAgent,       # Lightweight, single-shot
