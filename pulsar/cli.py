@@ -16,7 +16,6 @@ from pulsar.core.presentation import JourneyPresenter
 from pulsar.core.intelligence.run_persistence import RunPersistence
 from pulsar.core.journey_orchestrator import Journey
 from pulsar.core.intelligence.shared_state_store import SharedStateStore
-from pulsar.core.intelligence.stage_agents import AceAgent
 
 app = typer.Typer(help="Pulsar - Data Quality CLI")
 logger = get_logger("pulsar.cli")
@@ -608,7 +607,8 @@ def chat(
 
 def _start_interactive_chat(shared_state: SharedStateStore):
     """Start the interactive chat loop."""
-    agent = AceAgent(
+    from pulsar.core.intelligence.narrator_agent import NarratorAgent
+    agent = NarratorAgent(
         shared_state=shared_state,
         conversation_id="chat_session",
     )
@@ -685,7 +685,8 @@ def analyze(
     """
     Run multi-agent analysis on a dataset.
 
-    --mode scout    : full onboarding (schema+quality+stats → narrator)
+    --mode scout    : fast onboarding (schema+quality → narrator)
+    --mode full     : deep analysis (schema+quality+stats → narrator)
     --mode schema   : structural identity only
     --mode quality  : data-quality audit only
     --mode stats    : statistical profiling only
@@ -710,27 +711,27 @@ def analyze(
 @app.command()
 def scout(
     file: str = typer.Argument(..., help="Path to data file (CSV/Parquet)"),
-    mode: str = typer.Option("scout", help="Analysis mode: scout, schema, quality, stats"),
     save: bool = typer.Option(False, "--save", help="Save verdict to file"),
     log_file: Optional[str] = typer.Option(None, help="Log file path"),
 ):
     """
-    Run multi-agent dataset onboarding intelligence.
+    Fast dataset onboarding: VERDICT + TOP FINDINGS + RECOMMENDATION.
 
-    Concurrently runs SchemaAgent + QualityAgent + StatsAgent, then
-    NarratorAgent synthesizes a 5-sentence verdict.
+    Runs SchemaAgent + QualityAgent concurrently (<60s on local Ollama),
+    then NarratorAgent synthesizes the verdict.
+    For deep analysis use: pulsar analyze --mode full
     """
     import asyncio
     import sys
 
     log_path = setup_logging(log_file or "logs")
-    logger.info(f"Scout command: file={file}, mode={mode}")
+    logger.info(f"Scout command: file={file}")
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     try:
-        asyncio.run(_run_scout(file, mode, save))
+        asyncio.run(_run_scout(file, "scout", save))
     except Exception as e:
         logger.error(f"Scout error: {e}", exc_info=True)
         typer.echo(f"[ERROR] {e}", err=True)
@@ -742,11 +743,23 @@ async def _run_scout(file: str, mode: str, save: bool) -> None:
     import asyncio
     from pulsar.core.intelligence.agent_registry import AgentRegistry
     from pulsar.core.intelligence.question_router import get_tiers, TIER1_QUESTION
-    from pulsar.core.intelligence.narrator_agent import NarratorAgent
 
     lf = load(file)
     df = lf.collect()
     dataset_name = Path(file).stem
+
+    _DOWNSAMPLE_THRESHOLD = 500_000
+    _DOWNSAMPLE_TARGET = 10_000
+    if df.shape[0] > _DOWNSAMPLE_THRESHOLD:
+        logger.info(
+            f"[SCOUT] Sampled {_DOWNSAMPLE_TARGET:,} of "
+            f"{df.shape[0]:,} rows for fast analysis."
+        )
+        typer.echo(
+            f"[INFO] Sampled {_DOWNSAMPLE_TARGET:,} of "
+            f"{df.shape[0]:,} rows for fast analysis."
+        )
+        df = df.sample(n=_DOWNSAMPLE_TARGET, seed=42)
 
     shared_state = SharedStateStore()
 
@@ -754,7 +767,7 @@ async def _run_scout(file: str, mode: str, save: bool) -> None:
 
     typer.echo(f"\n[SCOUT] Dataset: {dataset_name}  ({df.shape[0]:,} rows × {df.shape[1]} cols)")
     typer.echo(f"[SCOUT] Running agents: {', '.join(tier1_keys)}" + (
-        f" → {', '.join(tier2_keys)}" if tier2_keys else ""
+        f" -> {', '.join(tier2_keys)}" if tier2_keys else ""
     ))
 
     # ── Tier 1: concurrent ───────────────────────────────────────────────────
@@ -787,7 +800,7 @@ async def _run_scout(file: str, mode: str, save: bool) -> None:
     verdict = ""
     if tier2_keys:
         typer.echo(f"[SCOUT] Tier 2: narrator synthesizing verdict…")
-        narrator = NarratorAgent(df=df, shared_state=shared_state)
+        narrator = AgentRegistry.get_agent("narrator", df=df, shared_state=shared_state)
         try:
             verdict = narrator.synthesize()
         except Exception as e:
@@ -797,12 +810,40 @@ async def _run_scout(file: str, mode: str, save: bool) -> None:
     # ── Output ────────────────────────────────────────────────────────────────
     separator = "=" * 70
     typer.echo(f"\n{separator}")
-    typer.echo(f"  SCOUT VERDICT — {dataset_name}")
-    typer.echo(f"{separator}\n")
-    typer.echo(verdict or "\n".join(
-        f"[{k.upper()}]\n{r}" for k, r in zip(tier1_keys, tier1_results)
-        if not isinstance(r, Exception)
-    ))
+
+    if mode == "scout" and not verdict:
+        # Fast-path scout: format from typed SharedStateStore keys
+        q_verdict = shared_state.get("quality.verdict", stage="cli") or "UNKNOWN"
+        q_issues = shared_state.get("quality.issues", stage="cli") or []
+        q_null = shared_state.get("quality.null_report", stage="cli") or {}
+        typer.echo(f"  VERDICT: {q_verdict} — {dataset_name}")
+        typer.echo(f"{separator}\n")
+        typer.echo("TOP FINDINGS:")
+        for i, issue in enumerate(q_issues[:3], 1):
+            typer.echo(f"  {i}. {issue}")
+        if not q_issues and q_null:
+            top = sorted(q_null.items(), key=lambda x: x[1], reverse=True)[:3]
+            for i, (col, pct) in enumerate(top, 1):
+                typer.echo(f"  {i}. {col}: {pct:.1f}% nulls")
+        rec_map = {
+            "BLOCK": "Fix blocking issues before proceeding. "
+                     "Run `pulsar analyze --mode quality` for full report.",
+            "WARN": "Proceed with caution. "
+                    "Run `pulsar analyze --mode quality` for full report.",
+            "CLEAN": "Data is ready. "
+                     "Run `pulsar analyze --mode full` for deep analysis.",
+        }
+        typer.echo(
+            f"\nRECOMMENDATION: {rec_map.get(q_verdict, 'Run pulsar analyze for details.')}"
+        )
+    else:
+        typer.echo(f"  VERDICT — {dataset_name}")
+        typer.echo(f"{separator}\n")
+        typer.echo(verdict or "\n".join(
+            f"[{k.upper()}]\n{r}" for k, r in zip(tier1_keys, tier1_results)
+            if not isinstance(r, Exception)
+        ))
+
     typer.echo(f"\n{separator}\n")
 
     if save:

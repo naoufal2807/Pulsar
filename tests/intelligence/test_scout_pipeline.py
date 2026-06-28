@@ -37,8 +37,18 @@ def shared_state():
 # ── Tier wiring ───────────────────────────────────────────────────────────────
 
 class TestPipelineWiring:
-    def test_scout_tier1_agents_are_domain_agents(self, sample_df, shared_state):
+    def test_scout_tier1_agents_are_schema_and_quality(self, sample_df, shared_state):
+        # scout is the fast path: schema + quality only
         tier1, _ = get_tiers("scout")
+        agents = [
+            AgentRegistry.get_agent(key, df=sample_df, shared_state=shared_state)
+            for key in tier1
+        ]
+        types = {type(a).__name__ for a in agents}
+        assert types == {"SchemaAgent", "QualityAgent"}
+
+    def test_full_mode_tier1_agents_are_all_three(self, sample_df, shared_state):
+        tier1, _ = get_tiers("full")
         agents = [
             AgentRegistry.get_agent(key, df=sample_df, shared_state=shared_state)
             for key in tier1
@@ -153,7 +163,8 @@ class TestToolExclusivity:
         assert narrator.tool_registry is None
         assert narrator.tools_enabled is False
 
-    def test_total_tier1_tool_count(self, sample_df, shared_state):
+    def test_scout_tier1_tool_count(self, sample_df, shared_state):
+        # scout fast path: schema(5) + quality(3) = 8 tools
         tier1, _ = get_tiers("scout")
         agents = [
             AgentRegistry.get_agent(key, df=sample_df, shared_state=shared_state)
@@ -162,22 +173,21 @@ class TestToolExclusivity:
         total = sum(
             len(a.tool_registry.tools) for a in agents if a.tool_registry
         )
-        # schema(5) + quality(3) + stats(8) = 16
+        assert total == 8
+
+    def test_full_mode_tier1_tool_count(self, sample_df, shared_state):
+        # full mode: schema(5) + quality(3) + stats(8) = 16 tools
+        tier1, _ = get_tiers("full")
+        agents = [
+            AgentRegistry.get_agent(key, df=sample_df, shared_state=shared_state)
+            for key in tier1
+        ]
+        total = sum(
+            len(a.tool_registry.tools) for a in agents if a.tool_registry
+        )
         assert total == 16
 
-    def test_tier1_agents_cover_all_16_tools(self, sample_df, shared_state):
-        from pulsar.core.intelligence.schema_tools import (
-            describe_dataset, infer_domain, identify_key_entities,
-            extract_key_metrics, describe_patterns,
-        )
-        from pulsar.core.intelligence.quality_tools import (
-            check_data_quality, detect_outliers, explain_outliers,
-        )
-        from pulsar.core.intelligence.stats_tools import (
-            compute_statistics, analyze_correlation, get_top_values,
-            analyze_concentration, analyze_distribution_skewness,
-            analyze_variability, analyze_relationships, find_top_performers,
-        )
+    def test_full_mode_covers_all_16_tools(self, sample_df, shared_state):
         expected = {
             "describe_dataset", "infer_domain", "identify_key_entities",
             "extract_key_metrics", "describe_patterns",
@@ -186,8 +196,7 @@ class TestToolExclusivity:
             "analyze_concentration", "analyze_distribution_skewness",
             "analyze_variability", "analyze_relationships", "find_top_performers",
         }
-
-        tier1, _ = get_tiers("scout")
+        tier1, _ = get_tiers("full")
         agents = [
             AgentRegistry.get_agent(key, df=sample_df, shared_state=shared_state)
             for key in tier1
@@ -196,7 +205,6 @@ class TestToolExclusivity:
         for a in agents:
             if a.tool_registry:
                 covered |= set(a.tool_registry.tools.keys())
-
         assert covered == expected
 
 
@@ -216,6 +224,152 @@ class TestModeCompleteness:
             assert tier2 == [], f"{mode} should have no tier2"
 
     def test_scout_and_narrator_modes_have_narrator_in_tier2(self):
-        for mode in ("scout", "narrator"):
+        for mode in ("scout", "narrator", "full"):
             _, tier2 = get_tiers(mode)
             assert "narrator" in tier2
+
+    def test_full_mode_exists(self):
+        assert "full" in list_modes()
+
+
+# ── Typed SharedStateStore keys ───────────────────────────────────────────────
+
+class TestTypedKeys:
+    def test_quality_agent_writes_verdict_key(self, sample_df):
+        """QualityAgent._write_typed_keys() writes quality.verdict."""
+        from pulsar.core.intelligence.quality_agent import QualityAgent
+        state = SharedStateStore()
+        agent = QualityAgent(df=sample_df, shared_state=state)
+        agent._write_typed_keys()
+        verdict = state.get("quality.verdict", stage="test")
+        assert verdict in ("CLEAN", "WARN", "BLOCK")
+
+    def test_quality_agent_writes_null_report_as_dict(self, sample_df):
+        """quality.null_report is dict[str, float], not free text."""
+        from pulsar.core.intelligence.quality_agent import QualityAgent
+        state = SharedStateStore()
+        agent = QualityAgent(df=sample_df, shared_state=state)
+        agent._write_typed_keys()
+        null_report = state.get("quality.null_report", stage="test")
+        assert isinstance(null_report, dict)
+        for col, pct in null_report.items():
+            assert isinstance(col, str)
+            assert isinstance(pct, (int, float))
+
+    def test_quality_agent_clean_verdict_on_complete_data(self):
+        """All-complete DataFrame → verdict CLEAN."""
+        from pulsar.core.intelligence.quality_agent import QualityAgent
+        df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+        state = SharedStateStore()
+        agent = QualityAgent(df=df, shared_state=state)
+        agent._write_typed_keys()
+        assert state.get("quality.verdict", stage="test") == "CLEAN"
+
+    def test_quality_agent_warn_verdict_on_high_nulls(self):
+        """Column with 11-50% nulls → verdict WARN (not BLOCK)."""
+        from pulsar.core.intelligence.quality_agent import QualityAgent
+        # 1 null out of 5 = 20% → above 10% threshold, below 50% → WARN
+        df = pl.DataFrame({
+            "a": [1, None, 3, 4, 5],
+            "b": ["x", "y", "z", "w", "v"],
+        })
+        state = SharedStateStore()
+        agent = QualityAgent(df=df, shared_state=state)
+        agent._write_typed_keys()
+        assert state.get("quality.verdict", stage="test") == "WARN"
+
+    def test_schema_agent_writes_types_as_dict(self, sample_df):
+        """schema.types is dict[str, str], not free text."""
+        from pulsar.core.intelligence.schema_agent import SchemaAgent
+        state = SharedStateStore()
+        agent = SchemaAgent(df=sample_df, shared_state=state)
+        agent._write_typed_keys()
+        types = state.get("schema.types", stage="test")
+        assert isinstance(types, dict)
+        assert set(types.keys()) == set(sample_df.columns)
+        for dtype_str in types.values():
+            assert isinstance(dtype_str, str)
+
+    def test_schema_agent_writes_columns_as_list(self, sample_df):
+        """schema.columns is list[dict] with name+dtype fields."""
+        from pulsar.core.intelligence.schema_agent import SchemaAgent
+        state = SharedStateStore()
+        agent = SchemaAgent(df=sample_df, shared_state=state)
+        agent._write_typed_keys()
+        columns = state.get("schema.columns", stage="test")
+        assert isinstance(columns, list)
+        assert len(columns) == sample_df.width
+        assert all("name" in c and "dtype" in c for c in columns)
+
+    def test_schema_agent_writes_cardinality_as_dict(self, sample_df):
+        """schema.cardinality is dict[str, int]."""
+        from pulsar.core.intelligence.schema_agent import SchemaAgent
+        state = SharedStateStore()
+        agent = SchemaAgent(df=sample_df, shared_state=state)
+        agent._write_typed_keys()
+        card = state.get("schema.cardinality", stage="test")
+        assert isinstance(card, dict)
+        for col, n in card.items():
+            assert isinstance(n, int)
+
+
+# ── Downsampling ──────────────────────────────────────────────────────────────
+
+class TestDownsampling:
+    def test_large_df_is_sampled(self):
+        """DataFrames > 500K rows are sampled to 10K before agents run."""
+        large_df = pl.DataFrame({"a": list(range(600_000))})
+        # Simulate the downsampling logic from _run_scout
+        _THRESHOLD = 500_000
+        _TARGET = 10_000
+        if large_df.shape[0] > _THRESHOLD:
+            sampled = large_df.sample(n=_TARGET, seed=42)
+        else:
+            sampled = large_df
+        assert sampled.shape[0] == _TARGET
+
+    def test_small_df_is_not_sampled(self, sample_df):
+        """DataFrames <= 500K rows are passed through unchanged."""
+        _THRESHOLD = 500_000
+        _TARGET = 10_000
+        if sample_df.shape[0] > _THRESHOLD:
+            sampled = sample_df.sample(n=_TARGET, seed=42)
+        else:
+            sampled = sample_df
+        assert sampled.shape[0] == sample_df.shape[0]
+
+
+# ── Tier-1 partial failure ────────────────────────────────────────────────────
+
+class TestPartialFailure:
+    def test_failed_agent_result_is_exception(self, sample_df, shared_state):
+        """asyncio.gather return_exceptions=True yields Exception on failure."""
+        import asyncio
+
+        async def _fail():
+            raise RuntimeError("LLM timeout")
+
+        async def _ok():
+            return "success"
+
+        async def run():
+            return await asyncio.gather(
+                _fail(), _ok(), return_exceptions=True
+            )
+
+        results = asyncio.run(run())
+        assert isinstance(results[0], RuntimeError)
+        assert results[1] == "success"
+
+    def test_surviving_agent_state_is_readable_after_partial_failure(
+        self, sample_df
+    ):
+        """When one agent fails, surviving agents' keys are still in SharedStateStore."""
+        state = SharedStateStore()
+        state.set("schema.findings", ["col_a: string"], stage="schema")
+        state.set("schema.response_summary", "Schema ok", stage="schema")
+        # quality agent "failed" — its keys are absent
+        # narrator should still see the schema keys
+        context = state.get("schema.findings", stage="narrator")
+        assert context == ["col_a: string"]
+        assert state.get("quality.findings", stage="narrator") is None

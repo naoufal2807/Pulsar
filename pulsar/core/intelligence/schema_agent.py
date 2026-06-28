@@ -52,8 +52,9 @@ class SchemaAgent(ReasoningAgent):
         from pulsar.core.intelligence.prompt_system import PromptSystem
         try:
             system_prompt = PromptSystem().render("domain_schema")
-        except Exception:
-            system_prompt = None  # fall back to base class default
+        except Exception as e:
+            logger.warning(f"Prompt load failed for domain_schema: {e}")
+            system_prompt = None
 
         # Pass tools_enabled=False so base does not create the
         # 16-tool registry. We replace it below with 5 schema tools.
@@ -71,6 +72,36 @@ class SchemaAgent(ReasoningAgent):
         if df is not None:
             self.tool_registry = self._create_registry(df)
             self.tools_enabled = True
+
+    def think(self, question: str) -> str:
+        """Run schema analysis then write typed keys to SharedStateStore."""
+        response = super().think(question)
+        self._write_typed_keys()
+        return response
+
+    def _write_typed_keys(self) -> None:
+        """Write deterministic schema keys after tool execution."""
+        if not self.shared_state or self.df is None:
+            return
+        df = self.df
+        self.shared_state.set(
+            "schema.columns",
+            [{"name": c, "dtype": str(df[c].dtype)} for c in df.columns],
+            stage="schema",
+        )
+        self.shared_state.set(
+            "schema.types",
+            {c: str(df[c].dtype) for c in df.columns},
+            stage="schema",
+        )
+        self.shared_state.set(
+            "schema.cardinality",
+            {c: df[c].n_unique() for c in df.columns},
+            stage="schema",
+        )
+        logger.info(
+            f"[SchemaAgent] wrote typed keys for {len(df.columns)} columns"
+        )
 
     @classmethod
     def _create_registry(cls, df: pl.DataFrame) -> ToolRegistry:

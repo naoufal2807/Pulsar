@@ -60,7 +60,8 @@ class NarratorAgent(ReasoningAgent):
         from pulsar.core.intelligence.prompt_system import PromptSystem
         try:
             system_prompt = PromptSystem().render("domain_narrator")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Prompt load failed for domain_narrator: {e}")
             system_prompt = None
 
         super().__init__(

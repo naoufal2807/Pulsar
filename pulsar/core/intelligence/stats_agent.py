@@ -53,7 +53,8 @@ class StatsAgent(ReasoningAgent):
         from pulsar.core.intelligence.prompt_system import PromptSystem
         try:
             system_prompt = PromptSystem().render("domain_stats")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Prompt load failed for domain_stats: {e}")
             system_prompt = None
 
         super().__init__(

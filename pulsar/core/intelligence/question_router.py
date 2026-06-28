@@ -11,7 +11,13 @@ from typing import Dict, List, Tuple
 # Key: CLI mode name
 # Value: dict with "tier1" (concurrent) and "tier2" (sequential after tier1)
 ROUTES: Dict[str, Dict[str, List[str]]] = {
+    # Fast path: schema + quality only (<60s on local Ollama)
     "scout": {
+        "tier1": ["schema", "quality"],
+        "tier2": ["narrator"],
+    },
+    # Full pipeline: all three tier-1 agents + narrator
+    "full": {
         "tier1": ["schema", "quality", "stats"],
         "tier2": ["narrator"],
     },

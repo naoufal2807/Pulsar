@@ -12,13 +12,20 @@ from pulsar.core.intelligence.question_router import (
 
 
 class TestGetTiers:
-    def test_scout_returns_three_tier1(self):
+    def test_scout_returns_two_tier1(self):
+        # scout is the fast path: schema + quality only (<60s on local Ollama)
         tier1, tier2 = get_tiers("scout")
-        assert set(tier1) == {"schema", "quality", "stats"}
+        assert set(tier1) == {"schema", "quality"}
 
     def test_scout_returns_narrator_tier2(self):
         tier1, tier2 = get_tiers("scout")
         assert tier2 == ["narrator"]
+
+    def test_full_mode_returns_three_tier1(self):
+        # full mode: all three tier-1 agents + narrator
+        tier1, tier2 = get_tiers("full")
+        assert set(tier1) == {"schema", "quality", "stats"}
+        assert "narrator" in tier2
 
     def test_schema_mode_only(self):
         tier1, tier2 = get_tiers("schema")
@@ -37,7 +44,7 @@ class TestGetTiers:
 
     def test_unknown_mode_falls_back_to_scout(self):
         tier1, tier2 = get_tiers("nonexistent_mode")
-        assert set(tier1) == {"schema", "quality", "stats"}
+        assert set(tier1) == {"schema", "quality"}
         assert "narrator" in tier2
 
     def test_returns_tuple_of_two_lists(self):
