@@ -61,3 +61,31 @@ test_output/
 # OS
 .DS_Store
 Thumbs.db
+
+# Pulsar runtime output
+runs/
+tool_results/
+checkpoints/
+baselines/
+drift_reports/
+intelligence_reports/
+journey_reports/
+agent_output.json
+
+# Temp dev docs
+AGENT_ARCHITECTURE_STATE_*.md
+AGENT_CONTEXT_*.md
+AGENT_STATES_*.svg
+ARCHITECTURE_*.svg
+BEFORE_AFTER_*.md
+CHAT_CLI_*.md
+CRITICAL_FIX_*.md
+DATA_FLOW_*.svg
+IMPLEMENTATION_*.md
+LAYERS_*.md
+LAYER_*.md
+SHARED_STATE_*.md
+SHARED_STATE_*.txt
+SOLUTION_*.md
+SVG_TO_PNG_*.md
+diagrams/

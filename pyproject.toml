@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pulsar-dq"
 version = "0.1.0"
-description = "Profile your data in seconds. CLI-first data quality platform."
+description = "Dataset onboarding intelligence. One command to a quality verdict."
 authors = [{name = "Naoufal SAADI", email = "naoufal@vortx.ai"}]
 license = {text = "MIT"}
 readme = "README.md"
@@ -18,25 +18,55 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 dependencies = [
     "polars>=0.19.0",
     "typer>=0.9.0",
     "pyyaml>=6.0",
+    "numpy>=1.23.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "python-json-logger>=2.0.0",
+    "rich>=13.0.0",
+    "requests>=2.31.0",
+    "ollama>=0.0.11",
+    "tiktoken>=0.5.0",
 ]
 
 [project.optional-dependencies]
+openai = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.20.0"]
+google = ["google-generativeai>=0.3.0"]
+all = [
+    "openai>=1.0.0",
+    "anthropic>=0.20.0",
+    "google-generativeai>=0.3.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "hypothesis>=6.70.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/naoufal2807/Pulsar"
+Repository = "https://github.com/naoufal2807/Pulsar"
+Issues = "https://github.com/naoufal2807/Pulsar/issues"
 
 [project.scripts]
 pulsar = "pulsar.cli:app"
 
-[tool.setuptools]
-packages = ["pulsar"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pulsar*"]
 
 [tool.setuptools.package-data]
-pulsar = ["*.yaml", "*.svg"]
+"pulsar" = ["*.yaml", "*.svg"]
+"pulsar.core.intelligence" = ["prompts/*.txt"]

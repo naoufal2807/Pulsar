@@ -7,6 +7,9 @@ from datetime import datetime
 from pathlib import Path
 import uuid
 
+# Layer 5: Request context for end-to-end tracing
+from pulsar.core.intelligence.request_context import RequestContextFilter
+
 
 # Global session ID
 SESSION_ID = str(uuid.uuid4())[:8]
@@ -45,24 +48,26 @@ def setup_logging(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_path / f"pulsar_{timestamp}_{SESSION_ID}.log"
     
-    # Create formatter
+    # Create formatter with Layer 5 request context fields
     formatter = logging.Formatter(
-        fmt='%(asctime)s | %(sessionId)s | %(name)s | %(levelname)s | %(message)s',
+        fmt='%(asctime)s | %(sessionId)s | [%(request_id)s] | %(name)s | %(levelname)s | %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    
+
     # File handler (verbose, includes everything)
     file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)  # File gets everything
     file_handler.setFormatter(formatter)
-    
+    file_handler.addFilter(RequestContextFilter())  # Layer 5: Add request context
+
     # Console handler (less verbose)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
     console_formatter = logging.Formatter(
-        fmt='%(levelname)s | %(name)s | %(message)s'
+        fmt='%(levelname)s | [%(request_id)s] | %(name)s | %(message)s'
     )
     console_handler.setFormatter(console_formatter)
+    console_handler.addFilter(RequestContextFilter())  # Layer 5: Add request context
     
     # Configure root logger
     root_logger = logging.getLogger()

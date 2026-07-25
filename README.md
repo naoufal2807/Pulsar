@@ -4,240 +4,132 @@
 
 # Pulsar ⚡
 
-**Profile your data in seconds. Not minutes. No framework required.**
-
----
-
-## The Problem
-
-I was profiling datasets constantly. Great Expectations is powerful, but it's built for enterprises. For teams, it's heavyweight.
-
-I wanted something **fast, simple, and CLI-first** that just tells me:
-- What's actually in my data?
-- Are there nulls? Outliers? Weird patterns?
-- Is this data usable or broken?
-
-I wanted answers in seconds. Not minutes. Not after learning a framework.
-
-So I built Pulsar.
+**Dataset onboarding intelligence. One command to a quality verdict.**
 
 ---
 
 ## What It Does
 
+Drop any CSV or Parquet file on Pulsar and get a schema audit, null/quality verdict, and a plain-English narrative — all in under 60 seconds.
+
 ```bash
-pulsar profile data.csv
+pulsar scout data.csv
 ```
 
-You get a complete profile in **8 seconds** (not 2 minutes):
+Four specialized AI agents run in parallel:
 
-```
-📊 Dataset: data.csv
-   3,964 rows | 8 columns | Profile Time: 0.02s
-
-Column: Subscribers (Int64)
-├─ Completeness: 100.0% (3,964/3,964)
-├─ Uniqueness: 53.8% (2,131 distinct)
-├─ Distribution: Min 0 | Max 474M | Mean 2.2M
-├─ Skewness: 12.3 (right-skewed)
-├─ Outliers: 47 detected (IQR method)
-└─ Percentiles: P25: 65K | P50: 343K | P75: 1.3M
-
-Column: Description (String)
-├─ Completeness: 87.2% (507 nulls) ⚠️
-├─ Uniqueness: 99.1%
-├─ String patterns: 98.5% have @, 12% have URLs
-└─ Sample: ['Welcome to...', 'Check out...', ...]
-
-Summary:
-├─ Overall completeness: 98.4%
-├─ Overall uniqueness: 75.9%
-├─ Columns with issues: Description (nulls)
-└─ Data quality: Ready for analysis
-```
-
-Done. You know what you're working with.
+- **SchemaAgent** — column types, cardinality, nullability
+- **QualityAgent** — null rates, issues, CLEAN / WARN / BLOCK verdict
+- **StatsAgent** — distributions, outliers, skewness
+- **NarratorAgent** — synthesizes everything into an actionable report
 
 ---
 
-## Quick Start
-
-### Profile
+## Install
 
 ```bash
-# Install
-git clone https://github.com/naoufal2807/Pulsar.io.git
-cd Pulsar.io
+# From PyPI (once published)
+pip install pulsar-dq
+
+# Or from source
+git clone https://github.com/naoufal2807/Pulsar
+cd Pulsar
 pip install -e .
-
-# Profile
-pulsar profile data.csv
-
-# Specific columns
-pulsar profile data.csv --columns user_id,email
-
-# Advanced metrics (outliers, patterns, skewness)
-pulsar profile data.csv --verbose
-
-# JSON export
-pulsar profile data.csv --output json > profile.json
-
-# Debug mode
-pulsar profile data.csv --verbose --log-file debug.log
 ```
 
-### Validate
-
-Create `rules.yaml`:
-
-```yaml
-rules:
-  - name: "email_valid"
-    column: "email"
-    type: "regex"
-    pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    threshold: 0.95
-
-  - name: "user_id_unique"
-    column: "user_id"
-    type: "unique"
-    threshold: 1.0
-
-  - name: "age_range"
-    column: "age"
-    type: "range"
-    min: 0
-    max: 150
-    threshold: 1.0
-```
-
-Run:
+Ollama is required for local inference. Install from [ollama.com](https://ollama.com), then pull a model:
 
 ```bash
-pulsar validate data.csv --rules rules.yaml --verbose
+ollama pull llama3
 ```
 
-Output:
-
-```
-======================================================================
-VALIDATION RESULTS
-======================================================================
-✅ email_valid                    PASS     95.2%
-✅ user_id_unique                 PASS    100.0%
-✅ age_range                      PASS    100.0%
-----------------------------------------------------------------------
-Summary: 3/3 rules passed (100.0%)
-======================================================================
-```
-
----
-
-## Why Choose Pulsar?
-
-### Speed
-
-- **Profile 10GB in 8 seconds** (vs. 2-5 minutes with other tools)
-- No startup overhead
-- Streaming evaluation
-- Built on Polars (fastest DataFrame library)
-
-### Simplicity
+Optional cloud LLM providers:
 
 ```bash
-# Just run it
-pulsar profile data.csv
-
-# Filter columns
-pulsar profile data.csv --columns user_id,email,age
-
-# Deep dive
-pulsar profile data.csv --verbose
-
-# Export
-pulsar profile data.csv --output json
+pip install pulsar-dq[openai]      # OpenAI
+pip install pulsar-dq[anthropic]   # Anthropic Claude
+pip install pulsar-dq[google]      # Google Gemini
+pip install pulsar-dq[all]         # All providers
 ```
 
-No Python code. No configuration. No framework.
+---
 
-### Philosophy
+## Usage
 
-- **Self-hosted** — Your data stays with you
-- **Open source** — See the code, verify it works
-- **One dependency** — Just Polars. That's it.
-- **Made for engineers** — By an engineer, for engineers
+```bash
+# Quick scout: schema + quality + narrative (<60s)
+pulsar scout data.csv
+
+# Full analysis: scout + statistics
+pulsar scout data.csv --mode full
+
+# Use a specific model
+pulsar scout data.csv --model llama3
+
+# Analyze a Parquet file
+pulsar scout warehouse.parquet
+```
 
 ---
 
-## Real Benchmarks
+## Example Output
 
-| Dataset | Pulsar | Time |
-|---------|--------|------|
-| 4K YouTube rows | 0.02s | Instant ⚡ |
-| 1M rows | 2.3s | Coffee break ☕ |
-| 10GB Parquet | 8s | Quick check |
+```
+┌─────────────────────────────────────────────────────┐
+│  Pulsar Scout — netflix_titles.csv                  │
+│  8,807 rows · 12 columns                            │
+└─────────────────────────────────────────────────────┘
 
-Great Expectations can do more, but it takes 10-30x longer.
+Quality Verdict: WARN
+  director   → 29.9% null
+  cast       → 9.8% null
+  country    → 6.9% null
 
-For **quick data inspection**, Pulsar wins.
+Schema
+  show_id    String   8,807 unique
+  type       String   2 categories (Movie / TV Show)
+  title      String   8,803 unique
+  release_year Int64  1925–2021
+  rating     String   14 categories
 
----
-
-## What You Get
-
-### Phase 1 (Now) ✅
-
-- ✅ Fast profiling (CSV, Parquet)
-- ✅ Completeness & uniqueness metrics
-- ✅ Distribution analysis (min, max, mean, std, percentiles P25-P99)
-- ✅ Outlier detection (IQR + Z-score methods)
-- ✅ Pattern matching (emails, URLs, phones, dates)
-- ✅ Column filtering
-- ✅ Validation rules (YAML-based, 5 rule types)
-- ✅ Verbose mode for deep dives
-- ✅ Multiple output formats (text, JSON, CSV)
-- ✅ Full logging & debugging
-
-### Phase 2 (Coming) 🔜
-
-- Real-time monitoring (watch your data continuously)
-- Drift detection (compare to baseline)
-- Quality scoring (% of rules passed)
-- Alerts (Slack, email, webhooks)
-
-### Phase 3 (Future) 📅
-
-- REST API (integrate into pipelines)
-- Database connectors (Snowflake, BigQuery, Postgres)
-- Anomaly detection (statistical outliers)
-- Predictive forecasting (forecast degradation)
+Narrative
+  This is a media content catalog for a streaming platform covering
+  8,807 titles across Movies and TV Shows. The dataset is usable but
+  has director and cast gaps — likely due to missing metadata at
+  ingest time, not data corruption. Safe to proceed with content
+  analysis; enrich director/cast from a secondary source if needed.
+```
 
 ---
 
-## Who Should Use This?
+## Architecture
 
-**You should use Pulsar if you:**
-- Profile CSV/Parquet files regularly
-- Want fast feedback on data quality
-- Prefer CLI tools over frameworks
-- Like things simple and self-hosted
-- Build data pipelines that need validation
+Pulsar uses **Approach B**: four domain-specialized agents with exclusive tool sets and a typed shared state store.
 
-**Great Expectations might be better if you:**
-- Need deep integration with data warehouses
-- Require complex, multi-step validation rules
-- Work in large enterprise environments
-- Want a managed SaaS solution
+```
+pulsar scout data.csv
+        │
+        ├─── SchemaAgent ────┐
+        │    (types, cardin.)│
+        │                    ▼
+        ├─── QualityAgent ──► SharedStateStore ──► NarratorAgent
+        │    (nulls, verdict)│                     (synthesis)
+        │                    │
+        └─── StatsAgent ─────┘ (full mode only)
+             (distributions)
+```
 
-**Both have their place.** Pulsar is for the 80% of use cases that don't need enterprise features.
+SharedStateStore typed keys written by agents:
+- `schema.columns`, `schema.types`, `schema.cardinality`
+- `quality.verdict` (CLEAN / WARN / BLOCK), `quality.null_report`, `quality.issues`
 
 ---
 
-## Contributing
+## Requirements
 
-This is early. Found a bug? Have an idea? Open an issue or PR.
-
-Help shape what Pulsar becomes.
+- Python 3.10+
+- Ollama (for local models) or an API key for OpenAI / Anthropic / Google
+- Polars, Typer, Rich (installed automatically)
 
 ---
 
@@ -247,10 +139,4 @@ MIT. Use it, fork it, modify it.
 
 ---
 
-## Who Built This?
-
-[Naoufal SAADI](https://github.com/naoufal2807) — Data engineer who got tired of waiting.
-
----
-
-**Trust your data. Pulsar ⚡**
+**Make data understand itself. Pulsar ⚡**

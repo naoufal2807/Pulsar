@@ -19,6 +19,8 @@ import polars as pl
 
 from pulsar.core.intelligence.agent import Agent
 from pulsar.core.intelligence.tools import create_default_registry
+from pulsar.core.presentation import JourneyPresenter, LogSuppressor
+from pulsar.core.intelligence.run_persistence import RunPersistence
 
 logger = logging.getLogger(__name__)
 
@@ -46,34 +48,75 @@ class JourneyCheckpoint:
 class DataExplorationJourney:
     """Guide user through structured data exploration."""
 
-    def __init__(self, df: pl.DataFrame, dataset_name: str):
+    def __init__(self, df: pl.DataFrame, dataset_name: str, run_id: Optional[str] = None):
         """
         Initialize journey for a dataset.
 
         Args:
             df: The DataFrame to explore
             dataset_name: Name of the dataset
+            run_id: Optional run ID for resumption
         """
         self.df = df
         self.dataset_name = dataset_name
         self.agent = Agent(df=df, tools_enabled=True)
+        self.presenter = JourneyPresenter(dataset_name)
+        self.persistence = RunPersistence()
 
         self.current_stage = Stage.SCOUT
         self.checkpoints: List[JourneyCheckpoint] = []
         self.total_insights = 0
+        self.run_id = run_id
+
+        # Create new run if not resuming
+        if not run_id:
+            self.run_id = self.persistence.create_run(
+                dataset_name=dataset_name,
+                total_rows=df.height,
+                total_columns=df.width,
+            )
+        else:
+            logger.info(f"Resuming run: {dataset_name}/{run_id}")
 
         logger.info(
             f"Starting data exploration journey for '{dataset_name}' "
-            f"({df.height} rows, {df.width} cols)"
+            f"({df.height} rows, {df.width} cols) [Run: {self.run_id}]"
         )
 
     def start_journey(self) -> str:
         """Start the data exploration journey at SCOUT stage."""
-        checkpoint = self._scout_stage()
+        # Check if already completed
+        if 'scout' in self._get_completed_stages():
+            logger.info("SCOUT stage already completed, skipping...")
+            checkpoint = self._load_stage_checkpoint('scout')
+            if checkpoint:
+                return ""  # Skip output, will be shown in summary
+
+        with LogSuppressor():
+            checkpoint = self._scout_stage()
         self.checkpoints.append(checkpoint)
         self.current_stage = Stage.SCOUT
 
-        return self._format_stage_introduction()
+        # Save to persistence
+        self.persistence.save_stage(
+            dataset_name=self.dataset_name,
+            run_id=self.run_id,
+            stage='scout',
+            progress=0,
+            analysis=checkpoint.description,
+            insights=checkpoint.insights_gained,
+        )
+
+        # Use presenter for clean output
+        intro = self.presenter.present_journey_intro()
+        stage_output = self.presenter.present_stage(
+            stage_name='SCOUT',
+            progress=0,
+            analysis=checkpoint.description,
+            insights=checkpoint.insights_gained,
+            hint=checkpoint.next_stage_hint,
+        )
+        return intro + stage_output
 
     def _scout_stage(self) -> JourneyCheckpoint:
         """Stage 1: SCOUT - Get basic dataset overview."""
@@ -161,7 +204,8 @@ class DataExplorationJourney:
             f"Avoid vague statements. This is DISCOVERY - find interesting facts!"
         )
 
-        exploration = self.agent.think(prompt, max_iterations=5)
+        with LogSuppressor():
+            exploration = self.agent.think(prompt, max_iterations=5)
 
         insights = [
             f"Identified {len(numeric_cols)} numeric columns",
@@ -178,6 +222,26 @@ class DataExplorationJourney:
             questions_explored=questions,
             insights_gained=insights,
             next_stage_hint="Next: DETECT anomalies and deep patterns in the data.",
+        )
+
+        self.checkpoints.append(checkpoint)
+
+        # Save to persistence
+        self.persistence.save_stage(
+            dataset_name=self.dataset_name,
+            run_id=self.run_id,
+            stage='explorer',
+            progress=25,
+            analysis=exploration,
+            insights=insights,
+        )
+
+        return self.presenter.present_stage(
+            stage_name='EXPLORER',
+            progress=25,
+            analysis=exploration,
+            insights=insights,
+            hint="Next: DETECT anomalies and deep patterns in the data.",
         )
 
         self.checkpoints.append(checkpoint)
@@ -223,7 +287,8 @@ class DataExplorationJourney:
             f"Give SPECIFIC column names and percentages."
         )
 
-        investigation = self.agent.think(prompt, max_iterations=5)
+        with LogSuppressor():
+            investigation = self.agent.think(prompt, max_iterations=5)
 
         insights = [
             "Detected anomalies and outliers",
@@ -243,7 +308,24 @@ class DataExplorationJourney:
         )
 
         self.checkpoints.append(checkpoint)
-        return self._format_stage_transition(Stage.EXPLORER, Stage.DETECTIVE)
+
+        # Save to persistence
+        self.persistence.save_stage(
+            dataset_name=self.dataset_name,
+            run_id=self.run_id,
+            stage='detective',
+            progress=50,
+            analysis=investigation,
+            insights=insights,
+        )
+
+        return self.presenter.present_stage(
+            stage_name='DETECTIVE',
+            progress=50,
+            analysis=investigation,
+            insights=insights,
+            hint="Next: ANALYZE correlations and advanced insights.",
+        )
 
     def analyst_stage(self) -> str:
         """Stage 4: ANALYST - Advanced insights and relationships."""
@@ -279,7 +361,8 @@ class DataExplorationJourney:
             f"Think like a strategist. What patterns would matter to executives?"
         )
 
-        analysis = self.agent.think(prompt, max_iterations=5)
+        with LogSuppressor():
+            analysis = self.agent.think(prompt, max_iterations=5)
 
         insights = [
             "Analyzed key correlations",
@@ -299,7 +382,24 @@ class DataExplorationJourney:
         )
 
         self.checkpoints.append(checkpoint)
-        return self._format_stage_transition(Stage.DETECTIVE, Stage.ANALYST)
+
+        # Save to persistence
+        self.persistence.save_stage(
+            dataset_name=self.dataset_name,
+            run_id=self.run_id,
+            stage='analyst',
+            progress=75,
+            analysis=analysis,
+            insights=insights,
+        )
+
+        return self.presenter.present_stage(
+            stage_name='ANALYST',
+            progress=75,
+            analysis=analysis,
+            insights=insights,
+            hint="Finally: Reach ACE mastery with expert recommendations.",
+        )
 
     def ace_stage(self) -> str:
         """Stage 5: ACE - Complete mastery and expert recommendations."""
@@ -333,7 +433,8 @@ class DataExplorationJourney:
             f"Be SPECIFIC, ACTIONABLE, and INSIGHTFUL."
         )
 
-        expert_synthesis = self.agent.think(prompt, max_iterations=3)
+        with LogSuppressor():
+            expert_synthesis = self.agent.think(prompt, max_iterations=3)
 
         insights = [
             "Synthesized all learnings",
@@ -353,7 +454,26 @@ class DataExplorationJourney:
         )
 
         self.checkpoints.append(checkpoint)
-        return self._format_stage_transition(Stage.ANALYST, Stage.ACE)
+
+        # Save to persistence
+        self.persistence.save_stage(
+            dataset_name=self.dataset_name,
+            run_id=self.run_id,
+            stage='ace',
+            progress=100,
+            analysis=expert_synthesis,
+            insights=insights,
+        )
+
+        # Mark run as completed
+        self.persistence.complete_run(self.dataset_name, self.run_id)
+
+        return self.presenter.present_stage(
+            stage_name='ACE',
+            progress=100,
+            analysis=expert_synthesis,
+            insights=insights,
+        )
 
     def run_complete_journey(self) -> str:
         """Run the complete journey from SCOUT to ACE."""
@@ -363,75 +483,39 @@ class DataExplorationJourney:
 
         # Stage 1: Scout
         results.append(self.start_journey())
-        results.append("\n" + "="*80 + "\n")
 
         # Stage 2: Explorer
         results.append(self.explore_stage())
-        results.append("\n" + "="*80 + "\n")
 
         # Stage 3: Detective
         results.append(self.detective_stage())
-        results.append("\n" + "="*80 + "\n")
 
         # Stage 4: Analyst
         results.append(self.analyst_stage())
-        results.append("\n" + "="*80 + "\n")
 
         # Stage 5: Ace
         results.append(self.ace_stage())
 
         return "".join(results)
 
-    def _format_stage_introduction(self) -> str:
-        """Format the introduction to the journey."""
-        return (
-            f"\n{'='*80}\n"
-            f"[JOURNEY] DATA EXPLORATION JOURNEY: {self.dataset_name}\n"
-            f"{'='*80}\n"
-            f"Your guide: Intelligent Agent\n"
-            f"Goal: Become an 'ACE' at understanding your data\n"
-            f"Progress: SCOUT (0%) > EXPLORER > DETECTIVE > ANALYST > ACE (100%)\n"
-            f"{'='*80}\n\n"
-            f"Starting at SCOUT stage...\n\n"
-            + self.checkpoints[-1].description
-        )
 
-    def _format_stage_transition(self, from_stage: Stage, to_stage: Stage) -> str:
-        """Format the transition between stages."""
-        percent = {
-            Stage.SCOUT: 0,
-            Stage.EXPLORER: 25,
-            Stage.DETECTIVE: 50,
-            Stage.ANALYST: 75,
-            Stage.ACE: 100,
-        }
+    def _get_completed_stages(self) -> List[str]:
+        """Get list of completed stages from persistence."""
+        metadata = self.persistence.get_run_metadata(self.dataset_name, self.run_id)
+        return metadata.completed_stages if metadata else []
 
-        stage_labels = {
-            Stage.SCOUT: "[SCOUT]",
-            Stage.EXPLORER: "[EXPLORER]",
-            Stage.DETECTIVE: "[DETECTIVE]",
-            Stage.ANALYST: "[ANALYST]",
-            Stage.ACE: "[ACE]",
-        }
-
-        checkpoint = self.checkpoints[-1]
-
-        transition = (
-            f"\n{'='*80}\n"
-            f"{stage_labels[to_stage]} {checkpoint.title}\n"
-            f"Progress: {percent[to_stage]}% Complete\n"
-            f"{'='*80}\n\n"
-            f"{checkpoint.description}\n\n"
-            f"[INSIGHTS] Key Insights This Stage:\n"
-        )
-
-        for insight in checkpoint.insights_gained:
-            transition += f"  • {insight}\n"
-
-        if checkpoint.next_stage_hint:
-            transition += f"\n[NEXT] {checkpoint.next_stage_hint}\n"
-
-        return transition
+    def _load_stage_checkpoint(self, stage: str) -> Optional[JourneyCheckpoint]:
+        """Load a saved stage checkpoint."""
+        cp = self.persistence.get_stage_checkpoint(self.dataset_name, self.run_id, stage)
+        if cp:
+            return JourneyCheckpoint(
+                stage=Stage[stage.upper()],
+                title=f"[{stage.upper()}]",
+                description=cp.analysis,
+                questions_explored=[],
+                insights_gained=cp.insights,
+            )
+        return None
 
     def get_journey_summary(self) -> Dict[str, Any]:
         """Get a summary of the journey completed."""

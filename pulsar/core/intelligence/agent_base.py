@@ -59,10 +59,11 @@ class Agent(ABC):
             from pulsar.core.llm_connectors import LLMProviderType
             llm_config = LLMConfig(
                 provider_type=LLMProviderType.OLLAMA,
-                model_name="gemma3:270m",
+                model_name="minimax-m3:cloud",
                 base_url="http://localhost:11434",
                 temperature=0.7,
                 max_tokens=1000,
+                timeout=120,  # Increased from 30s for tool-heavy operations
             )
 
         try:
